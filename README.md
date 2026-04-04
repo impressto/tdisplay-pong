@@ -1,6 +1,6 @@
 # 🎮 ESP32 Pong Game - Learn Electronics!
 
-A fun pong game for the TTGO T-Display that teaches you how to wire up LEDs, buzzers, and motors that react to what happens in the game!
+A fun pong game for the TTGO T-Display with sound effects powered by a DFPlayer Mini MP3 module!
 
 
 <img src="https://github.com/impressto/tdisplay-pong/blob/master/esp-pong.jpg" />
@@ -9,24 +9,19 @@ A fun pong game for the TTGO T-Display that teaches you how to wire up LEDs, buz
 ## What You'll Learn
 
 - How to upload code to an ESP32
-- How to wire LEDs, buzzers, and motors
+- How to wire and use a DFPlayer Mini for sound
 - How software controls hardware through GPIO pins
-- Basic electronics with resistors and circuits
+- Serial communication between devices
 
 ## What You Need
 
 ### Hardware
 - **TTGO T-Display** (ESP32 with built-in screen)
 - **USB-C cable** to connect to your computer
-- **Breadboard** for building circuits
+- **DFPlayer Mini** MP3 module for sound effects
+- **Micro SD card** with MP3 files for game sounds
+- **Small speaker** (3W 8ohm recommended)
 - **Jumper wires** to connect things
-
-### Optional Components (pick what you have!)
-- LEDs (any color)
-- 220Ω resistors (for LEDs)
-- Piezo buzzer
-- Small vibration motor
-- NPN transistor (like 2N2222) for motors
 
 ### Software
 - [VS Code](https://code.visualstudio.com/) with [PlatformIO extension](https://platformio.org/install/ide?install=vscode)
@@ -73,100 +68,63 @@ Before wiring anything, play the game to understand when events happen:
 
 ## Wiring Up Electronics!
 
-The game triggers GPIO pins when events happen. You can connect things to these pins!
+The game triggers events when things happen in the game. These events play sounds through the DFPlayer!
 
-### Event Pins
+### DFPlayer Mini Wiring
 
-| Event | GPIO Pin | When Does It Trigger? |
-|-------|----------|----------------------|
-| Wall Bounce | **26** | Ball bounces off any wall |
-| Paddle Hit | **27** | Ball hits your paddle |
-| Score Gained | **32** | You score a point! |
-| Score Lost | **33** | You miss the ball |
+Connect the DFPlayer Mini to your T-Display:
 
-### Project 1: LED Light Show 💡
-
-Make an LED light up when you hit the ball!
-
-**What you need:**
-- 1 LED
-- 1 resistor (220Ω - has red-red-brown stripes)
-- 2 jumper wires
-
-**Wiring:**
 ```
-GPIO 27 -----> 220Ω Resistor -----> LED (long leg +) -----> LED (short leg -) -----> GND
+T-Display          DFPlayer Mini
+---------          -------------
+GPIO 17 (TX) ----> RX
+GPIO 21 (RX) ----> TX
+GND          ----> GND
+3.3V/5V      ----> VCC
+                   SPK1 ----> Speaker (+)
+                   SPK2 ----> Speaker (-)
 ```
 
-**Step by step:**
-1. Connect a jumper wire from **GPIO 27** to one end of the resistor
-2. Connect the other end of the resistor to the **long leg** of the LED (that's the + side)
-3. Connect the **short leg** of the LED to **GND** on the T-Display
+**Note:** The DFPlayer can run on 3.3V or 5V. Use 5V for louder sound output.
 
-Now when you hit the ball, the LED lights up!
+### Setting Up Sound Files
 
-### Project 2: Multi-Color Light Show 🌈
+1. Format a micro SD card as FAT32
+2. Create a folder named `mp3` in the root
+3. Name your sound files with numbers: `0001.mp3`, `0002.mp3`, etc.
+4. Insert the SD card into the DFPlayer
 
-Use 4 different colored LEDs for each event!
+**Recommended sound files:**
+| File | Event |
+|------|-------|
+| `0001.mp3` | Wall bounce sound |
+| `0002.mp3` | Paddle hit sound |
+| `0003.mp3` | Score gained sound |
+| `0004.mp3` | Score lost sound |
 
-**Wiring:**
-```
-GPIO 26 (Wall)   -----> 220Ω -----> Blue LED   -----> GND
-GPIO 27 (Paddle) -----> 220Ω -----> Green LED  -----> GND  
-GPIO 32 (Score+) -----> 220Ω -----> Yellow LED -----> GND
-GPIO 33 (Score-) -----> 220Ω -----> Red LED    -----> GND
-```
+### Game Events
 
-### Project 3: Sound Effects 🔊
-
-Add a buzzer that beeps when you score!
-
-**What you need:**
-- 1 piezo buzzer
-
-**Wiring:**
-```
-GPIO 32 -----> Buzzer (+) 
-GND     -----> Buzzer (-)
-```
-
-**Note:** Most small piezo buzzers can connect directly. If yours doesn't make sound, you might need a transistor circuit (ask an adult!).
-
-### Project 4: Vibration Motor 📳
-
-Make something shake when you miss!
-
-**What you need:**
-- 1 small vibration motor
-- 1 NPN transistor (2N2222 or similar)
-- 1 resistor (1kΩ)
-- 1 diode (1N4001 - optional but recommended)
-
-**Wiring (with transistor):**
-```
-GPIO 33 -----> 1kΩ Resistor -----> Transistor Base (middle pin)
-3.3V    -----> Motor (+) -----> Motor (-) -----> Transistor Collector (right pin)
-GND     -----> Transistor Emitter (left pin)
-```
-
-⚠️ **Important:** Motors need more power than an LED. The transistor acts like a switch that the ESP32 controls!
+| Event | When Does It Trigger? |
+|-------|----------------------|
+| Wall Bounce | Ball bounces off any wall |
+| Paddle Hit | Ball hits your paddle |
+| Score Gained | You score a point! |
+| Score Lost | You miss the ball |
 
 ## Customizing the Game
 
 Open `src/config.h` to change settings:
 
 ```c
-// Change which pins the events use
-#define PIN_WALL_BOUNCE    26   // Change to any free GPIO
-#define PIN_PADDLE_HIT     27
-#define PIN_SCORE_GAINED   32
-#define PIN_SCORE_LOST     33
+// DFPlayer pins
+#define DFPLAYER_TX_PIN    17   // TX to DFPlayer RX
+#define DFPLAYER_RX_PIN    21   // RX from DFPlayer TX
 
-// How long the pin stays ON (in milliseconds)
-#define EVENT_PULSE_MS     50   // Try 100 for longer flashes!
-
-// Disable a pin by setting it to -1
-#define PIN_WALL_BOUNCE    -1   // This turns off wall bounce events
+// Sound file numbers (on SD card)
+#define SOUND_WALL_BOUNCE  1    // Plays 0001.mp3
+#define SOUND_PADDLE_HIT   2    // Plays 0002.mp3
+#define SOUND_SCORE_GAINED 3    // Plays 0003.mp3
+#define SOUND_SCORE_LOST   4    // Plays 0004.mp3
 ```
 
 ### Other Fun Settings to Try
@@ -183,7 +141,7 @@ Open `src/config.h` to change settings:
 
 ## Adding Your Own Event Code! 🛠️
 
-Want to do more than just turn a pin on and off? You can add your own custom code!
+Want to customize what happens when game events occur? You can add your own custom code!
 
 ### Where to Put Your Code
 
@@ -213,33 +171,20 @@ void onScoreLost() {
 }
 ```
 
-### Example: Play Different Tones
+### Example: Play Different Sounds
 
-Instead of just turning a pin on/off, make a buzzer play different sounds:
-
-```c
-void onPaddleHit() {
-  // Play a happy beep!
-  tone(PIN_PADDLE_HIT, 1000, 50);  // 1000 Hz for 50ms
-}
-
-void onScoreLost() {
-  // Play a sad sound
-  tone(PIN_SCORE_LOST, 200, 200);  // Low 200 Hz for 200ms
-}
-```
-
-### Example: Flash an LED Multiple Times
+You can adjust volume or play different tracks based on game state:
 
 ```c
 void onScoreGained() {
-  // Flash 3 times to celebrate!
-  for (int i = 0; i < 3; i++) {
-    digitalWrite(PIN_SCORE_GAINED, HIGH);
-    delay(50);
-    digitalWrite(PIN_SCORE_GAINED, LOW);
-    delay(50);
-  }
+  // Play a victory sound at higher volume!
+  dfPlayer.volume(25);
+  dfPlayer.play(SOUND_SCORE_GAINED);
+}
+
+void onScoreLost() {
+  // Play a sad sound 
+  dfPlayer.play(SOUND_SCORE_LOST);
 }
 ```
 
@@ -254,41 +199,35 @@ void onScoreGained() {
 
 ## T-Display Pinout
 
-Here are the GPIO pins you can use:
+Here are the GPIO pins used in this project:
 
-| Pin | Safe to Use? | Notes |
-|-----|--------------|-------|
-| 0 | ⚠️ | Used for left button (onboard) |
-| 2 | ✅ | |
-| 12 | ✅ | |
-| 13 | 🎮 | Default: External LEFT button |
-| 15 | ✅ | |
-| 17 | ✅ | TX pin for dfplayer
-| 21 | ✅ | RX pin for dfplayer
-| 22 | ✅ | |
-| 25 | 🎮 | Default: External RIGHT  button |
-| 26 | ✅ | Default: Wall bounce |
-| 27 | ✅ | Default: Paddle hit |
-| 32 | ✅ | Default: Score gained |
-| 33 | ✅ | Default: Score lost |
-| 35 | ⚠️ | Used for right button (onboard, input only) |
+| Pin | Usage | Notes |
+|-----|-------|-------|
+| 0 | Left button | Onboard button |
+| 13 | External button | Default: External LEFT button |
+| 17 | DFPlayer TX | Serial TX to DFPlayer RX |
+| 21 | DFPlayer RX | Serial RX from DFPlayer TX |
+| 25 | External button | Default: External RIGHT button |
+| 35 | Right button | Onboard button (input only) |
 
 ## Troubleshooting
 
-### LED doesn't light up
-- Check the LED is the right way around (long leg to +, short to -)
-- Make sure you have a resistor - LEDs need them!
-- Try a different GPIO pin
+### No sound from DFPlayer
+- Check wiring: TX to RX, RX to TX (they cross over!)
+- Make sure the SD card is formatted as FAT32
+- Verify sound files are in an `mp3` folder and named `0001.mp3`, `0002.mp3`, etc.
+- Try a different speaker
+- Check the DFPlayer is getting power (3.3V or 5V)
 
 ### Code won't upload
 - Try pressing the RESET button on the T-Display
 - Make sure the USB cable supports data (some only charge)
 - Try a different USB port
 
-### Game runs but nothing happens on pins
+### Game runs but no sound on events
 - Check your wiring connections
-- Make sure you're using the right GPIO pins
-- Try the `onWallBounce` event first - it happens most often!
+- Verify the SD card is inserted properly
+- Try playing a sound manually to test the DFPlayer
 
 ## Want to Learn More?
 
@@ -302,7 +241,7 @@ Here are the GPIO pins you can use:
 - 🎨 Custom ball sprite with rolling animation
 - 🖼️ Background image support
 - 🎮 Onboard + external button control
-- ⚡ Event hooks for LEDs, buzzers, motors
+- 🔊 DFPlayer Mini sound effects for game events
 - 📈 Increasing difficulty as you score
 
 
