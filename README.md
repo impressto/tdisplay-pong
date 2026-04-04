@@ -257,12 +257,12 @@ Here are the GPIO pins you can use:
 | 0 | ⚠️ | Used for left button (onboard) |
 | 2 | ✅ | |
 | 12 | ✅ | |
-| 13 | 🎮 | Default: External RIGHT button |
+| 13 | 🎮 | Default: External LEFT button |
 | 15 | ✅ | |
-| 17 | ✅ | |
-| 21 | ✅ | |
+| 17 | ✅ | TX pin for dfplayer
+| 21 | ✅ | RX pin for dfplayer
 | 22 | ✅ | |
-| 25 | 🎮 | Default: External LEFT button |
+| 25 | 🎮 | Default: External RIGHT  button |
 | 26 | ✅ | Default: Wall bounce |
 | 27 | ✅ | Default: Paddle hit |
 | 32 | ✅ | Default: Score gained |
