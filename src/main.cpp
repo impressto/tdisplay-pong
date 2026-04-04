@@ -13,7 +13,7 @@
 
 // Squash/Pong game for TTGO T-Display
 // Original by kickiss2: https://github.com/kickiss2/TTGO_games
-// Controls: Left button = paddle down, Right button = paddle up
+// Controls: Left button = paddle left, Right button = paddle right
 
 TFT_eSPI tft = TFT_eSPI();
 
@@ -38,6 +38,11 @@ int16_t dy = 1;
 
 int16_t ballSpeed = BALL_SPEED_START;  // Current ball speed (frame skip counter)
 int16_t ballFrame = 0;                  // Frame counter for ball movement
+
+#if USE_BALL_SPRITE
+float ballAngle = 0;                    // Ball rotation angle for rolling effect
+#define BALL_ROTATION_SPEED 0.25         // Degrees per pixel of movement
+#endif
 
 int16_t score = 0;
 int16_t lastScore = -1;
@@ -109,12 +114,29 @@ void ball() {
   }
   ballFrame = 0;
 
+#if USE_BALL_SPRITE
+  // Clear larger area to account for rotated sprite bounds (diagonal = s * sqrt(2))
+  int16_t clearPad = 8;  // Extra padding for rotation
+  clearWithBackground(x - clearPad, y - clearPad, s + clearPad * 2, s + clearPad * 2);
+#else
   clearWithBackground(x, y, s, s);
+#endif
   x = x + dx;
   y = y + dy;
   
 #if USE_BALL_SPRITE
-  ballSprite.pushSprite(x, y, TRANSPARENT_COLOR);
+  // Update ball rotation based on velocity (simulate rolling)
+  // Positive dx = moving right = clockwise rotation
+  float speed = sqrt((float)(dx * dx + dy * dy));
+  ballAngle += dx > 0 ? speed * BALL_ROTATION_SPEED : -speed * BALL_ROTATION_SPEED;
+  // Keep angle in 0-360 range
+  if (ballAngle >= 360) ballAngle -= 360;
+  if (ballAngle < 0) ballAngle += 360;
+  
+  // Set pivot point on TFT where sprite center should appear
+  tft.setPivot(x + s/2, y + s/2);
+  // Push rotated sprite centered on pivot
+  ballSprite.pushRotated((int16_t)ballAngle, TRANSPARENT_COLOR);
 #else
   tft.fillRect(x, y, s, s, COLOR_BALL);
 #endif
@@ -173,15 +195,22 @@ void ball() {
   }
 }
 
+// Helper to check if a button is pressed (handles disabled pins)
+bool isButtonPressed(int pin) {
+  if (pin < 0) return false;
+  return digitalRead(pin) == 0;
+}
+
 void paddle() {
   // Clear wider area to ensure old paddle pixels are removed
   clearWithBackground(w - PADDLE_OFFSET - 6, pady, 6, padh);
   
   // Move paddle only while button is pressed (no inertia)
-  if (digitalRead(LEFT_BUTTON) == 0 && pady + padh < h) {
+  // Check both onboard AND external buttons
+  if ((isButtonPressed(LEFT_BUTTON) || isButtonPressed(EXT_BUTTON_DOWN)) && pady + padh < h) {
     pady += PADDLE_SPEED;
   }
-  if (digitalRead(RIGHT_BUTTON) == 0 && pady > 0) {
+  if ((isButtonPressed(RIGHT_BUTTON) || isButtonPressed(EXT_BUTTON_UP)) && pady > 0) {
     pady -= PADDLE_SPEED;
   }
   
@@ -218,6 +247,14 @@ void setup() {
   
   pinMode(LEFT_BUTTON, INPUT_PULLUP);
   pinMode(RIGHT_BUTTON, INPUT_PULLUP);
+  
+  // Initialize external button pins (if enabled)
+  #if EXT_BUTTON_DOWN >= 0
+    pinMode(EXT_BUTTON_DOWN, INPUT_PULLUP);
+  #endif
+  #if EXT_BUTTON_UP >= 0
+    pinMode(EXT_BUTTON_UP, INPUT_PULLUP);
+  #endif
   
   setupEventPins();  // Initialize event hook GPIO pins
   

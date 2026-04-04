@@ -10,9 +10,25 @@
 #define SCREEN_HEIGHT  135
 #define SCORE_AREA_WIDTH 30  // Left margin reserved for score display
 
-// --- Button Pins ---
-#define LEFT_BUTTON    0    // GPIO 0 - moves paddle down
-#define RIGHT_BUTTON   35   // GPIO 35 - moves paddle up
+// --- Button Pins (Onboard) ---
+#define LEFT_BUTTON    0    // GPIO 0 - moves paddle left
+#define RIGHT_BUTTON   35   // GPIO 35 - moves paddle right
+
+// ===========================================
+// External Button Pins - For Student Projects!
+// ===========================================
+// Connect external buttons for a better gaming experience!
+// Buttons should connect the pin to GND when pressed.
+//
+// Wiring Guide:
+// - Button one leg -> GPIO pin
+// - Button other leg -> GND
+// (Internal pull-up resistors are enabled, no external resistor needed)
+//
+// Set to -1 to disable external buttons
+// ===========================================
+#define EXT_BUTTON_DOWN   25   // External button - moves paddle left
+#define EXT_BUTTON_UP     13   // External button - moves paddle right
 
 // --- Paddle Settings (as seen in portrait orientation) ---
 #define PADDLE_WIDTH   15   // Visual width of paddle (horizontal in portrait view)

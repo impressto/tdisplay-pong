@@ -29,10 +29,26 @@ A fun pong game for the TTGO T-Display that teaches you how to wire up LEDs, buz
 
 ## How to Play
 
-1. **Left Button (GPIO 0)** - Move paddle DOWN
-2. **Right Button (GPIO 35)** - Move paddle UP
-3. Hit the ball with your paddle to score points!
-4. If you miss, you lose a point
+### Onboard Buttons
+1. **Left Button (GPIO 0)** - Move paddle LEFT
+2. **Right Button (GPIO 35)** - Move paddle RIGHT
+
+### External Buttons (Optional)
+You can add your own buttons for a better gaming experience!
+- **GPIO 25** - External button to move paddle LEFT
+- **GPIO 13** - External button to move paddle RIGHT
+
+**Wiring external buttons:**
+```
+Button leg 1 -----> GPIO pin (25 or 13)
+Button leg 2 -----> GND
+```
+No resistor needed - the ESP32 has internal pull-up resistors!
+
+### Gameplay
+- Hit the ball with your paddle to score points!
+- The ball appears to **roll** as it moves - watch it spin!
+- If you miss, you lose a point
 
 ## Getting Started
 
@@ -155,6 +171,10 @@ Open `src/config.h` to change settings:
 #define PADDLE_WIDTH   15    // Make paddle bigger = easier game
 #define BALL_SPEED_START 3   // Higher number = slower ball
 #define PADDLE_SPEED   2     // How fast paddle moves
+
+// External button pins (set to -1 to disable)
+#define EXT_BUTTON_DOWN  25  // External button - paddle left
+#define EXT_BUTTON_UP    13  // External button - paddle right
 ```
 
 ## Adding Your Own Event Code! 🛠️
@@ -234,20 +254,20 @@ Here are the GPIO pins you can use:
 
 | Pin | Safe to Use? | Notes |
 |-----|--------------|-------|
-| 0 | ⚠️ | Used for left button |
+| 0 | ⚠️ | Used for left button (onboard) |
 | 2 | ✅ | |
 | 12 | ✅ | |
-| 13 | ✅ | |
+| 13 | 🎮 | Default: External RIGHT button |
 | 15 | ✅ | |
 | 17 | ✅ | |
 | 21 | ✅ | |
 | 22 | ✅ | |
-| 25 | ✅ | |
+| 25 | 🎮 | Default: External LEFT button |
 | 26 | ✅ | Default: Wall bounce |
 | 27 | ✅ | Default: Paddle hit |
 | 32 | ✅ | Default: Score gained |
 | 33 | ✅ | Default: Score lost |
-| 35 | ⚠️ | Used for right button (input only) |
+| 35 | ⚠️ | Used for right button (onboard, input only) |
 
 ## Troubleshooting
 
@@ -271,6 +291,15 @@ Here are the GPIO pins you can use:
 - Change the ball to a different image! (Look at `kim-jong-un.h`)
 - Add your own background image! (Look at `background.h`)
 - Create new events for different game situations
+- Adjust the ball rotation speed in `main.cpp` (`BALL_ROTATION_SPEED`)
+
+## Features
+
+- 🎨 Custom ball sprite with rolling animation
+- 🖼️ Background image support
+- 🎮 Onboard + external button control
+- ⚡ Event hooks for LEDs, buzzers, motors
+- 📈 Increasing difficulty as you score
 
 ## Credits
 
