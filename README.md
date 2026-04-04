@@ -301,10 +301,7 @@ Here are the GPIO pins you can use:
 - ⚡ Event hooks for LEDs, buzzers, motors
 - 📈 Increasing difficulty as you score
 
-## Credits
 
-- Original game by [kickiss2](https://github.com/kickiss2/TTGO_games)
-- Event hooks system for learning electronics
 
 ---
 
