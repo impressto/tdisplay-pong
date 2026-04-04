@@ -80,11 +80,10 @@ void drawScore() {
 
 void resetBall() {
   x = SCORE_AREA_WIDTH;  // Start after score area
-  y = random(0, h - s);
+  y = 0;                  // Start at top of screen
   dx = 1;
-  // Random starting angle between -MAX_DY and +MAX_DY, but not zero
+  // Random starting angle, always start moving downward
   dy = random(1, BALL_MAX_DY + 1);
-  if (random(0, 2) == 0) dy = -dy;
   ballSpeed = BALL_SPEED_START;
   ballFrame = 0;
 }
@@ -138,7 +137,8 @@ void ball() {
 
   // Paddle collision - only count hits on the front face (ball moving towards paddle)
   // Ball center must be within paddle range (no side clips)
-  if (dx > 0 && cx + cw >= w - PADDLE_OFFSET - PADDLE_HEIGHT) {
+  // Also ensure ball hasn't already passed behind the paddle
+  if (dx > 0 && cx + cw >= w - PADDLE_OFFSET - PADDLE_HEIGHT && cx < w - PADDLE_OFFSET) {
     int ballCenter = cy + ch / 2;
     // Only score if ball center is within paddle's vertical range
     if (ballCenter >= pady && ballCenter <= pady + padh) {
