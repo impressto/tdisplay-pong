@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <TFT_eSPI.h>
 #include "config.h"
+#include "events.h"
 
 #if USE_BALL_SPRITE
 #include "kim-jong-un.h"
@@ -40,6 +41,10 @@ int16_t ballFrame = 0;                  // Frame counter for ball movement
 
 int16_t score = 0;
 int16_t lastScore = -1;
+
+int16_t paddleFlashFrames = 0;  // Frames remaining for paddle flash effect
+#define PADDLE_FLASH_DURATION 30   // How many frames the flash lasts
+#define COLOR_PADDLE_FLASH 0xFFFF // White flash color
 
 // Redraw a rectangle from the background image
 void clearWithBackground(int16_t rx, int16_t ry, int16_t rw, int16_t rh) {
@@ -93,6 +98,7 @@ void ball() {
   if (x > w + s) {
     // Player missed - deduct a point (minimum 0)
     if (score > 0) score--;
+    onScoreLost();  // EVENT: Player lost a point!
     resetBall();
   }
 
@@ -123,16 +129,19 @@ void ball() {
   if (cy + ch >= h) {
     y = h - BALL_COLLISION_Y - ch;
     dy = -dy;
+    onWallBounce();  // EVENT: Ball hit bottom wall!
   }
   if (cy <= 0) {
     y = -BALL_COLLISION_Y;
     dy = -dy;
+    onWallBounce();  // EVENT: Ball hit top wall!
   }
 
   // Left wall collision (respect score area)
   if (cx <= SCORE_AREA_WIDTH) {
     x = SCORE_AREA_WIDTH - BALL_COLLISION_X;
     dx = -dx;
+    onWallBounce();  // EVENT: Ball hit left wall!
   }
 
   // Paddle collision - only count hits on the front face (ball moving towards paddle)
@@ -149,6 +158,9 @@ void ball() {
         ballSpeed -= BALL_SPEED_INC;
       }
       score++;
+      paddleFlashFrames = PADDLE_FLASH_DURATION;  // Trigger flash effect
+      onPaddleHit();   // EVENT: Ball hit the paddle!
+      onScoreGained(); // EVENT: Player scored a point!
       
       // Add spin based on where ball center hits paddle
       int paddleCenter = pady + padh / 2;
@@ -177,7 +189,13 @@ void paddle() {
   if (pady < 0) pady = 0;
   if (pady + padh > h) pady = h - padh;
   
-  tft.fillRect(w - PADDLE_OFFSET - PADDLE_HEIGHT, pady, PADDLE_HEIGHT, padh, COLOR_PADDLE);
+  // Draw paddle with flash effect when hit
+  uint16_t paddleColor = COLOR_PADDLE;
+  if (paddleFlashFrames > 0) {
+    paddleColor = COLOR_PADDLE_FLASH;
+    paddleFlashFrames--;
+  }
+  tft.fillRect(w - PADDLE_OFFSET - PADDLE_HEIGHT, pady, PADDLE_HEIGHT, padh, paddleColor);
 }
 
 void setup() {
@@ -201,6 +219,8 @@ void setup() {
   pinMode(LEFT_BUTTON, INPUT_PULLUP);
   pinMode(RIGHT_BUTTON, INPUT_PULLUP);
   
+  setupEventPins();  // Initialize event hook GPIO pins
+  
 #if USE_BALL_SPRITE
   ballSprite.createSprite(BALL_SIZE, BALL_SIZE);
   ballSprite.setSwapBytes(true);
@@ -212,6 +232,7 @@ void setup() {
 
 void loop() {
   delay(dly);
+  updateEventPins();  // Turn off event pins after pulse duration
   paddle();
   ball();
   drawScore();

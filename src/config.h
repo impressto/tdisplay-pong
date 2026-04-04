@@ -47,4 +47,27 @@
 #define COLOR_BALL     0xFFFF  // White
 #define COLOR_PADDLE   0xF800  // Red
 
+// ===========================================
+// Event Hook Pins - For Teaching Electronics!
+// ===========================================
+// These pins trigger when game events happen.
+// Connect LEDs, buzzers, or motors to learn
+// how software controls hardware!
+//
+// Wiring Guide:
+// - LED: Pin -> 220Ω resistor -> LED (+) -> GND
+// - Buzzer: Pin -> Buzzer (+) -> GND
+// - Motor: Pin -> Transistor base (with resistor)
+//
+// Set to -1 to disable a pin
+// ===========================================
+
+#define PIN_WALL_BOUNCE    26   // Fires when ball bounces off any wall
+#define PIN_PADDLE_HIT     27   // Fires when ball hits the paddle
+#define PIN_SCORE_GAINED   32   // Fires when player scores a point
+#define PIN_SCORE_LOST     33   // Fires when player misses the ball
+
+// --- Event Pulse Duration ---
+#define EVENT_PULSE_MS     50   // How long pins stay HIGH (milliseconds)
+
 #endif
