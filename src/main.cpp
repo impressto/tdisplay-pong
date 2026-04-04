@@ -24,9 +24,8 @@ TFT_eSprite ballSprite = TFT_eSprite(&tft);
 int16_t h = SCREEN_HEIGHT;
 int16_t w = SCREEN_WIDTH;
 
-int16_t ipady = 0;
 int16_t pady = 0;
-int16_t padh = PADDLE_HEIGHT;
+int16_t padh = PADDLE_WIDTH;
 
 int dly = GAME_DELAY;
 int16_t s = BALL_SIZE;
@@ -38,9 +37,6 @@ int16_t dy = 1;
 
 int16_t ballSpeed = BALL_SPEED_START;  // Current ball speed (frame skip counter)
 int16_t ballFrame = 0;                  // Frame counter for ball movement
-
-int16_t inertia = 0;
-int16_t ispeed = PADDLE_INERTIA;
 
 int16_t score = 0;
 int16_t lastScore = -1;
@@ -67,27 +63,37 @@ void clearWithBackground(int16_t rx, int16_t ry, int16_t rw, int16_t rh) {
 
 void drawScore() {
   if (score != lastScore) {
-    clearWithBackground(2, 2, 50, 12);
-    tft.setTextColor(COLOR_PADDLE);
-    tft.setTextSize(1);
-    tft.setCursor(2, 2);
+    // Clear previous score area (at left edge, rotated text area)
+    clearWithBackground(0, 0, SCORE_AREA_WIDTH, 100);
+    
+    // Temporarily switch to portrait rotation for text
+    tft.setRotation(0);
+    tft.setTextColor(TFT_BLACK);
+    tft.setTextSize(2);
+    tft.setCursor(5, 5);
     tft.printf("Score:%d", score);
+    tft.setRotation(1);  // Back to landscape for game
+    
     lastScore = score;
   }
 }
 
 void resetBall() {
-  x = 0;
-  y = random(0, h);
+  x = SCORE_AREA_WIDTH;  // Start after score area
+  y = random(0, h - s);
   dx = 1;
-  dy = random(1, 3) - 1;
+  // Random starting angle between -MAX_DY and +MAX_DY, but not zero
+  dy = random(1, BALL_MAX_DY + 1);
+  if (random(0, 2) == 0) dy = -dy;
   ballSpeed = BALL_SPEED_START;
   ballFrame = 0;
-  score = 0;
 }
 
 void ball() {
-  if (x + s > w + 200) {
+  // Ball went past paddle - reset at far left
+  if (x > w + s) {
+    // Player missed - deduct a point (minimum 0)
+    if (score > 0) score--;
     resetBall();
   }
 
@@ -108,57 +114,70 @@ void ball() {
   tft.fillRect(x, y, s, s, COLOR_BALL);
 #endif
 
-  if (y + s == h || y == 0) {
+  // Collision box coordinates (relative to screen)
+  int16_t cx = x + BALL_COLLISION_X;
+  int16_t cy = y + BALL_COLLISION_Y;
+  int16_t cw = BALL_COLLISION_W;
+  int16_t ch = BALL_COLLISION_H;
+
+  // Top/bottom wall collision
+  if (cy + ch >= h) {
+    y = h - BALL_COLLISION_Y - ch;
+    dy = -dy;
+  }
+  if (cy <= 0) {
+    y = -BALL_COLLISION_Y;
     dy = -dy;
   }
 
-  if (x == 0) {
+  // Left wall collision (respect score area)
+  if (cx <= SCORE_AREA_WIDTH) {
+    x = SCORE_AREA_WIDTH - BALL_COLLISION_X;
     dx = -dx;
   }
 
-  if (x + s == w) {
-    if (y >= pady && y <= pady + padh) {
+  // Paddle collision - only count hits on the front face (ball moving towards paddle)
+  // Ball center must be within paddle range (no side clips)
+  if (dx > 0 && cx + cw >= w - PADDLE_OFFSET - PADDLE_HEIGHT) {
+    int ballCenter = cy + ch / 2;
+    // Only score if ball center is within paddle's vertical range
+    if (ballCenter >= pady && ballCenter <= pady + padh) {
+      x = w - PADDLE_OFFSET - PADDLE_HEIGHT - BALL_COLLISION_X - cw;  // Push ball back
       dx = -dx;
       // Increase ball speed on paddle hit
       if (ballSpeed > BALL_SPEED_MIN) {
         ballSpeed -= BALL_SPEED_INC;
       }
       score++;
-    }
-    if (y <= pady + padh && y >= (pady + padh / 2) && dy <= 0) {
-      dy = 1;
-    }
-    if (y >= pady && y <= (pady + padh / 2) && dy >= 0) {
-      dy = -1;
+      
+      // Add spin based on where ball center hits paddle
+      int paddleCenter = pady + padh / 2;
+      if (ballCenter > paddleCenter) {
+        dy = random(1, BALL_MAX_DY + 1);  // Hit bottom half - bounce down
+      } else {
+        dy = -random(1, BALL_MAX_DY + 1); // Hit top half - bounce up
+      }
     }
   }
 }
 
 void paddle() {
-  clearWithBackground(w - PADDLE_WIDTH, pady, PADDLE_WIDTH, padh);
+  // Clear wider area to ensure old paddle pixels are removed
+  clearWithBackground(w - PADDLE_OFFSET - 6, pady, 6, padh);
   
-  if (digitalRead(LEFT_BUTTON) == 0) {
-    inertia = ispeed;
+  // Move paddle only while button is pressed (no inertia)
+  if (digitalRead(LEFT_BUTTON) == 0 && pady + padh < h) {
+    pady += PADDLE_SPEED;
   }
-  if (digitalRead(RIGHT_BUTTON) == 0) {
-    inertia = -ispeed;
-  }
-  if (digitalRead(LEFT_BUTTON) == 0 && digitalRead(RIGHT_BUTTON) == 0) {
-    inertia = 0;
-  }
-  
-  if (inertia > 0 && pady + padh < h) {
-    ipady = ipady + inertia;
-    pady = round(ipady / ispeed);
-    inertia = inertia - 1;
-  }
-  if (inertia < 0 && pady > 0) {
-    ipady = ipady + inertia;
-    pady = round(ipady / ispeed);
-    inertia = inertia + 1;
+  if (digitalRead(RIGHT_BUTTON) == 0 && pady > 0) {
+    pady -= PADDLE_SPEED;
   }
   
-  tft.drawRect(w - PADDLE_WIDTH, pady, PADDLE_WIDTH, padh, COLOR_PADDLE);
+  // Clamp paddle to screen bounds
+  if (pady < 0) pady = 0;
+  if (pady + padh > h) pady = h - padh;
+  
+  tft.fillRect(w - PADDLE_OFFSET - PADDLE_HEIGHT, pady, PADDLE_HEIGHT, padh, COLOR_PADDLE);
 }
 
 void setup() {
@@ -168,6 +187,7 @@ void setup() {
   
   tft.init();
   tft.setRotation(1);
+  tft.fillScreen(TFT_BLACK);  // Clear entire display first
   
 #if USE_BACKGROUND
   tft.setSwapBytes(true);
@@ -184,7 +204,7 @@ void setup() {
 #if USE_BALL_SPRITE
   ballSprite.createSprite(BALL_SIZE, BALL_SIZE);
   ballSprite.setSwapBytes(true);
-  ballSprite.pushImage(0, 0, BALL_SIZE, BALL_SIZE, kim_jong_un2);
+  ballSprite.pushImage(0, 0, BALL_SIZE, BALL_SIZE, forever_alone);
 #endif
   
   resetBall();
