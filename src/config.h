@@ -86,4 +86,29 @@
 // --- Event Pulse Duration ---
 #define EVENT_PULSE_MS     50   // How long pins stay HIGH (milliseconds)
 
+// ===========================================
+// DFPlayer Mini MP3 Module Configuration
+// ===========================================
+// Connect a DFPlayer Mini to play sounds on events!
+// Put MP3 files on SD card as: 0001.mp3, 0002.mp3, 0003.mp3
+//
+// Wiring Guide:
+// - DFPlayer RX -> ESP32 TX pin (through 1K resistor recommended)
+// - DFPlayer TX -> ESP32 RX pin
+// - DFPlayer VCC -> 5V
+// - DFPlayer GND -> GND
+// - Speaker connected to DFPlayer SPK_1 and SPK_2
+//
+// Set DFPLAYER_ENABLED to 0 to disable
+// ===========================================
+#define DFPLAYER_ENABLED   1     // 1 = enable DFPlayer, 0 = disable
+#define DFPLAYER_TX_PIN    17    // ESP32 TX -> DFPlayer RX
+#define DFPLAYER_RX_PIN    21    // ESP32 RX <- DFPlayer TX
+#define DFPLAYER_VOLUME    20    // Volume 0-30
+
+// Track assignments (file numbers on SD card)
+#define TRACK_WALL_BOUNCE  1     // 0001.mp3 - played on wall bounce
+#define TRACK_PADDLE_HIT   2     // 0002.mp3 - played on paddle hit & score gained
+#define TRACK_SCORE_LOST   3     // 0003.mp3 - played on score lost
+
 #endif

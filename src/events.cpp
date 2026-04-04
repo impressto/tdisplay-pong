@@ -7,6 +7,16 @@
 // game events happen. Modify this file to add
 // your own custom behaviors!
 
+// ===========================================
+// DFPlayer Mini Setup
+// ===========================================
+#if DFPLAYER_ENABLED
+  #include <HardwareSerial.h>
+  static HardwareSerial dfPlayerSerial(1);  // Use UART1
+  static DFRobotDFPlayerMini dfPlayer;
+  static bool dfPlayerReady = false;
+#endif
+
 // Track when to turn off event pins (0 = already off)
 static unsigned long wallBounceOffTime = 0;
 static unsigned long paddleHitOffTime = 0;
@@ -33,6 +43,21 @@ void setupEventPins() {
   #if PIN_SCORE_LOST >= 0
     pinMode(PIN_SCORE_LOST, OUTPUT);
     digitalWrite(PIN_SCORE_LOST, LOW);
+  #endif
+
+  // Initialize DFPlayer Mini
+  #if DFPLAYER_ENABLED
+    dfPlayerSerial.begin(9600, SERIAL_8N1, DFPLAYER_RX_PIN, DFPLAYER_TX_PIN);
+    delay(100);  // Give DFPlayer time to initialize
+    
+    if (dfPlayer.begin(dfPlayerSerial)) {
+      dfPlayerReady = true;
+      dfPlayer.volume(DFPLAYER_VOLUME);
+      Serial.println("DFPlayer Mini initialized!");
+    } else {
+      dfPlayerReady = false;
+      Serial.println("DFPlayer Mini not found - check wiring!");
+    }
   #endif
 }
 
@@ -80,12 +105,24 @@ void onWallBounce() {
     digitalWrite(PIN_WALL_BOUNCE, HIGH);
     wallBounceOffTime = millis() + EVENT_PULSE_MS;
   #endif
+  
+  #if DFPLAYER_ENABLED
+    if (dfPlayerReady) {
+      dfPlayer.play(TRACK_WALL_BOUNCE);  // Play track 1
+    }
+  #endif
 }
 
 void onPaddleHit() {
   #if PIN_PADDLE_HIT >= 0
     digitalWrite(PIN_PADDLE_HIT, HIGH);
     paddleHitOffTime = millis() + EVENT_PULSE_MS;
+  #endif
+  
+  #if DFPLAYER_ENABLED
+    if (dfPlayerReady) {
+      dfPlayer.play(TRACK_PADDLE_HIT);  // Play track 2
+    }
   #endif
 }
 
@@ -94,11 +131,23 @@ void onScoreGained() {
     digitalWrite(PIN_SCORE_GAINED, HIGH);
     scoreGainedOffTime = millis() + EVENT_PULSE_MS;
   #endif
+  
+  #if DFPLAYER_ENABLED
+    if (dfPlayerReady) {
+      dfPlayer.play(TRACK_PADDLE_HIT);  // Play track 2 (same as paddle hit)
+    }
+  #endif
 }
 
 void onScoreLost() {
   #if PIN_SCORE_LOST >= 0
     digitalWrite(PIN_SCORE_LOST, HIGH);
     scoreLostOffTime = millis() + EVENT_PULSE_MS;
+  #endif
+  
+  #if DFPLAYER_ENABLED
+    if (dfPlayerReady) {
+      dfPlayer.play(TRACK_SCORE_LOST);  // Play track 3
+    }
   #endif
 }

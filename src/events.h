@@ -23,6 +23,10 @@
 #include <Arduino.h>
 #include "config.h"
 
+#if DFPLAYER_ENABLED
+  #include <DFRobotDFPlayerMini.h>
+#endif
+
 // Initialize all event pins - call this in setup()
 void setupEventPins();
 
