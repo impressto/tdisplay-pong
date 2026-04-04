@@ -2,6 +2,9 @@
 
 A fun pong game for the TTGO T-Display that teaches you how to wire up LEDs, buzzers, and motors that react to what happens in the game!
 
+<img src="https://github.com/impressto/tdisplay-pong/blob/kimjung/pong-esp32.jpg" />
+
+
 ## What You'll Learn
 
 - How to upload code to an ESP32
