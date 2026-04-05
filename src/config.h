@@ -90,25 +90,81 @@
 // DFPlayer Mini MP3 Module Configuration
 // ===========================================
 // Connect a DFPlayer Mini to play sounds on events!
-// Put MP3 files on SD card as: 0001.mp3, 0002.mp3, 0003.mp3
+// Put MP3 files on SD card in /mp3/ folder as: 0001.mp3, 0002.mp3, 0003.mp3
+// (Using /mp3/ folder is faster than root folder!)
 //
 // Wiring Guide:
 // - DFPlayer RX -> ESP32 TX pin (through 1K resistor recommended)
 // - DFPlayer TX -> ESP32 RX pin
+// - DFPlayer BUSY -> ESP32 GPIO (reads LOW when playing)
 // - DFPlayer VCC -> 5V
 // - DFPlayer GND -> GND
 // - Speaker connected to DFPlayer SPK_1 and SPK_2
+//
+// Tips for low latency:
+// - Use short sound files (< 1 second)
+// - Use low bitrate (64-128 kbps)
+// - Use fast SD card (Class 10+)
 //
 // Set DFPLAYER_ENABLED to 0 to disable
 // ===========================================
 #define DFPLAYER_ENABLED   1     // 1 = enable DFPlayer, 0 = disable
 #define DFPLAYER_TX_PIN    17    // ESP32 TX -> DFPlayer RX
 #define DFPLAYER_RX_PIN    21    // ESP32 RX <- DFPlayer TX
-#define DFPLAYER_VOLUME    20    // Volume 0-30
+#define DFPLAYER_BUSY_PIN  22    // ESP32 <- DFPlayer BUSY (LOW = playing)
+#define DFPLAYER_VOLUME    10    // Volume 0-30
 
-// Track assignments (file numbers on SD card)
-#define TRACK_WALL_BOUNCE  1     // 0001.mp3 - played on wall bounce
-#define TRACK_PADDLE_HIT   2     // 0002.mp3 - played on paddle hit & score gained
+// Track assignments (file numbers on SD card, 0 = disabled)
+#define TRACK_AWARD        1     // 0001.mp3 - played when player hits a score milestone
+#define TRACK_PADDLE_HIT   2     // 0002.mp3 - played on paddle hit & regular score gained
 #define TRACK_SCORE_LOST   3     // 0003.mp3 - played on score lost
+
+// Milestone: play TRACK_AWARD instead of TRACK_PADDLE_HIT every X points
+#define SCORE_MILESTONE_INTERVAL  5    // Award sound plays at score 5, 10, 15, 20 ...
+
+// Sound playback behavior
+#define DFPLAYER_WAIT_FOR_FINISH  1    // 1 = wait for track to finish, 0 = allow interrupts
+
+// ===========================================
+// ISD1820 Voice Record Playback Module
+// ===========================================
+// A simpler alternative to the DFPlayer Mini.
+// The ISD1820 stores ONE recorded sound and plays
+// it back when triggered — no SD card needed!
+//
+// How to record your sound:
+// 1. Hold the REC button on the module and speak
+//    (or play a sound into the microphone)
+// 2. Release REC when done — the sound is saved
+//    permanently even when power is removed
+//
+// Wiring Guide:
+// - ISD1820 VCC  -> 3.3V or 5V
+// - ISD1820 GND  -> GND
+// - ISD1820 P-E  -> ESP32 GPIO pin below
+//   (P-E = Play Edge-triggered: brief HIGH pulse plays the sound once)
+// - ISD1820 SP+  -> Speaker (+)
+// - ISD1820 SP-  -> Speaker (-)
+//
+// Choose which game events trigger the sound:
+//   ISD1820_TRIGGER_PADDLE_HIT  1 = play when ball hits paddle
+//   ISD1820_TRIGGER_SCORE_LOST  1 = play when player misses ball
+//
+// NOTE: Only ONE sound module can be active at a time.
+//       Set DFPLAYER_ENABLED 0 when using ISD1820.
+// ===========================================
+
+// Safety check — compiler will error if both modules are enabled
+#if DFPLAYER_ENABLED && defined(ISD1820_ENABLED) && ISD1820_ENABLED
+  #error "Only one sound module can be enabled at a time. Set DFPLAYER_ENABLED or ISD1820_ENABLED to 0."
+#endif
+
+#define ISD1820_ENABLED             0    // 1 = enable ISD1820, 0 = disable
+#define ISD1820_PLAY_PIN            15   // ESP32 GPIO -> ISD1820 P-E (play edge) pin
+#define ISD1820_PULSE_MS            120  // Pulse duration (ms) — long enough to trigger reliably
+
+// Choose which events trigger the ISD1820 (1 = yes, 0 = no)
+#define ISD1820_TRIGGER_PADDLE_HIT  1    // Play sound on paddle hit
+#define ISD1820_TRIGGER_SCORE_LOST  1    // Play sound when player misses the ball
 
 #endif

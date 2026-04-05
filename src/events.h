@@ -34,9 +34,9 @@ void setupEventPins();
 void updateEventPins();
 
 // Event trigger functions - call these when events happen!
-void onWallBounce();   // Ball bounced off a wall
-void onPaddleHit();    // Ball hit the paddle
-void onScoreGained();  // Player scored a point
-void onScoreLost();    // Player missed the ball
+void onWallBounce();                    // Ball bounced off a wall
+void onPaddleHit();                     // Ball hit the paddle
+void onScoreGained(int16_t newScore);   // Player scored a point (pass new score value)
+void onScoreLost();                     // Player missed the ball
 
 #endif

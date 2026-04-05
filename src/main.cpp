@@ -181,8 +181,8 @@ void ball() {
       }
       score++;
       paddleFlashFrames = PADDLE_FLASH_DURATION;  // Trigger flash effect
-      onPaddleHit();   // EVENT: Ball hit the paddle!
-      onScoreGained(); // EVENT: Player scored a point!
+      onPaddleHit();        // EVENT: Ball hit the paddle!
+      onScoreGained(score); // EVENT: Player scored a point!
       
       // Add spin based on where ball center hits paddle
       int paddleCenter = pady + padh / 2;
@@ -228,6 +228,10 @@ void paddle() {
 }
 
 void setup() {
+  // Initialize serial for debug output
+  Serial.begin(115200);
+  Serial.println("\n[Setup] Starting...");
+  
   // Turn on backlight
   pinMode(TFT_BL, OUTPUT);
   digitalWrite(TFT_BL, HIGH);
