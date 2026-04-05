@@ -5,6 +5,11 @@ A fun pong game for the TTGO T-Display with sound effects. Choose your sound mod
 - **ISD1820** — simple record-and-play chip, one recorded sound triggered on paddle hit or score lost
 
 
+<img src="https://github.com/impressto/tdisplay-pong/blob/master/readme-banner.jpg" />
+
+
+### The board
+
 <img src="https://github.com/impressto/tdisplay-pong/blob/master/esp-pong.jpg" />
 
 
