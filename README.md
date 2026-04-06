@@ -81,6 +81,10 @@ Before wiring anything, play the game to understand when events happen:
 
 ## Wiring Up Sound!
 
+<img src="https://github.com/impressto/tdisplay-pong/blob/master/pong-board.jpg" />
+
+
+
 Pick **one** sound module and follow its wiring guide below. Then set the matching option in `config.h`.
 
 ---
