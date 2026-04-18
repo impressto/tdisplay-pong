@@ -2,17 +2,31 @@
 #define CONFIG_H
 
 // ===========================================
-// Squash/Pong Game Configuration
+// Pong Game Configuration
 // ===========================================
 
-// --- Display Settings ---
+// --- Game Mode ---
+#define GAME_MODE_1P       0    // Human vs AI
+#define GAME_MODE_2P       1    // Human vs Human
+
+// --- Display Settings (Landscape orientation) ---
 #define SCREEN_WIDTH   240
 #define SCREEN_HEIGHT  135
-#define SCORE_AREA_WIDTH 30  // Left margin reserved for score display
 
-// --- Button Pins (Onboard) ---
-#define LEFT_BUTTON    0    // GPIO 0 - moves paddle left
-#define RIGHT_BUTTON   35   // GPIO 35 - moves paddle right
+// --- Menu Navigation Buttons ---
+// These buttons are used to navigate the menu and select options
+// The 32-button matrix can be mapped here for menu navigation
+#define MENU_UP_BUTTON      35   // Navigate up in menu
+#define MENU_DOWN_BUTTON    0    // Navigate down in menu  
+#define MENU_SELECT_BUTTON  35   // Select menu option (same as UP for simplicity)
+
+// --- Player 1 Controls (Left paddle) ---
+#define P1_UP_BUTTON       0    // GPIO 0 - Player 1 paddle up
+#define P1_DOWN_BUTTON     35   // GPIO 35 - Player 1 paddle down
+
+// --- Player 2 Controls (Right paddle - for 2P mode) ---
+#define P2_UP_BUTTON       -1   // Player 2 paddle up (set to GPIO or -1 to disable)
+#define P2_DOWN_BUTTON     -1   // Player 2 paddle down
 
 // ===========================================
 // External Button Pins - For Student Projects!
@@ -27,30 +41,41 @@
 //
 // Set to -1 to disable external buttons
 // ===========================================
-#define EXT_BUTTON_DOWN   25   // External button - moves paddle left
-#define EXT_BUTTON_UP     13   // External button - moves paddle right
+#define EXT_P1_UP         13   // External button - Player 1 paddle up
+#define EXT_P1_DOWN       25   // External button - Player 1 paddle down
+#define EXT_P2_UP         -1   // External button - Player 2 paddle up
+#define EXT_P2_DOWN       -1   // External button - Player 2 paddle down
 
-// --- Paddle Settings (as seen in portrait orientation) ---
-#define PADDLE_WIDTH   15   // Visual width of paddle (horizontal in portrait view)
-#define PADDLE_HEIGHT  4    // Visual height/thickness of paddle
-#define PADDLE_SPEED   2    // Pixels to move per frame when button held
-#define PADDLE_OFFSET  5    // Pixels from right edge of screen
+// --- Paddle Settings ---
+#define PADDLE_WIDTH   30   // Length of paddle (vertical)
+#define PADDLE_HEIGHT  4    // Thickness of paddle (horizontal)
+#define PADDLE_SPEED   3    // Pixels to move per frame when button held
+#define PADDLE_OFFSET  10   // Pixels from edge of screen
 
 // --- Ball Settings ---
-#define BALL_SIZE      32   // Ball size in pixels (matches sprite)
-#define BALL_SPEED_START  3    // Initial delay between ball moves (higher = slower)
-#define BALL_SPEED_INC    1    // Speed increase per paddle hit (decrease delay)
-#define BALL_SPEED_MIN    1    // Minimum delay (max speed)
-#define USE_BALL_SPRITE   1    // 1 = use sprite image, 0 = use simple square
+#define BALL_RADIUS        6     // Ball radius in pixels (circle)
 
-// --- Ball Collision Box (relative to ball x,y position) ---
-#define BALL_COLLISION_X      8    // X offset of collision box within sprite
-#define BALL_COLLISION_Y      8    // Y offset of collision box within sprite
-#define BALL_COLLISION_W      16   // Width of collision box
-#define BALL_COLLISION_H      16   // Height of collision box
+// --- Difficulty Levels ---
+// Ball speed for each difficulty (1=fastest, 5=slowest)
+// Lower number = faster ball = harder game!
+#define DIFFICULTY_EASY    3     // Slow ball - good for beginners!
+#define DIFFICULTY_MEDIUM  2     // Medium speed - a fun challenge!
+#define DIFFICULTY_HARD    1     // Fast ball - for experts only!
 
 // --- Ball Movement ---
-#define BALL_MAX_DY           3    // Maximum vertical speed (higher = steeper angles)
+#define BALL_MAX_DY        4     // Maximum vertical speed (higher = steeper angles)
+#define BALL_START_DX      2     // Starting horizontal speed
+
+// --- AI Settings ---
+#define AI_SPEED           2     // AI paddle movement speed
+#define AI_REACTION_DELAY  3     // Frames before AI reacts (higher = easier)
+#define AI_ERROR_MARGIN    10    // Random error in AI positioning (higher = easier)
+
+// --- Net Settings ---
+#define NET_DASH_LENGTH    8     // Length of each dash
+#define NET_DASH_GAP       6     // Gap between dashes
+#define NET_WIDTH          2     // Width of net line
+#define NET_COLOR          0xFFFF // White (RGB565)
 
 // --- Game Speed ---
 #define GAME_DELAY     5    // Delay between frames (ms) - lower = faster
@@ -58,10 +83,75 @@
 // --- Background ---
 #define USE_BACKGROUND    1    // 1 = use background image, 0 = solid color
 
-// --- Colors (RGB565 format) ---
-#define COLOR_BG       0x0000  // Black (used when USE_BACKGROUND=0)
-#define COLOR_BALL     0xFFFF  // White
-#define COLOR_PADDLE   0xF800  // Red
+// ===========================================
+// Colors (RGB565 format)
+// ===========================================
+// Pick your favorite colors! Here are some options:
+//
+//   COLOR NAME     VALUE      WHAT IT LOOKS LIKE
+//   ----------     ------     ------------------
+//   Black          0x0000     ■ (like space!)
+//   White          0xFFFF     □ (like snow!)
+//   Red            0xF800     ■ (like an apple!)
+//   Green          0x07E0     ■ (like grass!)
+//   Blue           0x001F     ■ (like the sky!)
+//   Yellow         0xFFE0     ■ (like the sun!)
+//   Cyan           0x07FF     ■ (like pool water!)
+//   Magenta        0xF81F     ■ (like a flower!)
+//   Orange         0xFD20     ■ (like an orange!)
+//   Purple         0x780F     ■ (like grapes!)
+//   Pink           0xFE19     ■ (like bubblegum!)
+//   Light Blue     0x867D     ■ (like a cloudy sky!)
+//   Lime           0x87E0     ■ (like a lime!)
+//
+//   DARKER COLORS:
+//   Dark Red       0x8000     ■ (like a cherry!)
+//   Dark Green     0x03E0     ■ (like a forest!)
+//   Dark Blue      0x0010     ■ (like the deep ocean!)
+//   Dark Orange    0xC280     ■ (like rust!)
+//   Dark Purple    0x4008     ■ (like a plum!)
+//   Dark Cyan      0x0410     ■ (like dark water!)
+//   Dark Yellow    0x8400     ■ (like mustard!)
+//   Brown          0x8200     ■ (like chocolate!)
+//   Maroon         0x8000     ■ (like a brick!)
+//   Navy           0x0010     ■ (like a sailor's uniform!)
+//   Gray           0x8410     ■ (like a rainy cloud!)
+//   Dark Gray      0x4208     ■ (like a shadow!)
+//
+// TRY IT: Change the color values below and upload
+//         to see your paddle or ball change color!
+// ===========================================
+
+#define COLOR_BG           0x0000  // Black (used when USE_BACKGROUND=0)
+#define COLOR_MENU_BG      0x0000  // Menu background color
+#define COLOR_MENU_TEXT    0xFFFF  // Menu text color
+#define COLOR_MENU_SELECT  0xFFE0  // Menu selected item color (yellow)
+
+// ===========================================
+// Theme Colors
+// ===========================================
+// Each theme has its own paddle and ball colors
+// to make sure they're visible against the background!
+//
+// Theme 0: Default (background1)
+// Theme 1: Spaceport (background2)
+// Theme 2: Minecraft (background3)
+// ===========================================
+
+// --- Default Theme Colors ---
+#define THEME0_BALL        0xF800  // Red ball
+#define THEME0_PADDLE_P1   0x07E0  // Green paddle
+#define THEME0_PADDLE_P2   0x001F  // Blue paddle
+
+// --- Spaceport Theme Colors ---
+#define THEME1_BALL        0xFFE0  // Yellow ball (visible in space!)
+#define THEME1_PADDLE_P1   0x07FF  // Cyan paddle
+#define THEME1_PADDLE_P2   0xFE19  // Pink paddle
+
+// --- Minecraft Theme Colors ---
+#define THEME2_BALL        0xFFFF  // White ball
+#define THEME2_PADDLE_P1   0xFD20  // Orange paddle
+#define THEME2_PADDLE_P2   0xF81F  // Magenta paddle
 
 // ===========================================
 // Event Hook Pins - For Teaching Electronics!

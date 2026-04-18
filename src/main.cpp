@@ -1,69 +1,165 @@
 #include <Arduino.h>
 #include <TFT_eSPI.h>
+#include <Preferences.h>
 #include "config.h"
 #include "events.h"
 
-#if USE_BALL_SPRITE
-#include "kim-jong-un.h"
-#endif
-
 #if USE_BACKGROUND
-#include "background.h"
+#include "background1.h"
+#include "background2.h"
+#include "background3.h"
 #endif
 
-// Squash/Pong game for TTGO T-Display
-// Original by kickiss2: https://github.com/kickiss2/TTGO_games
-// Controls: Left button = paddle left, Right button = paddle right
+// ===========================================
+// Pong Game for TTGO T-Display
+// Supports 1 Player (vs AI) and 2 Player modes
+// ===========================================
 
 TFT_eSPI tft = TFT_eSPI();
+Preferences preferences;
 
-#if USE_BALL_SPRITE
-TFT_eSprite ballSprite = TFT_eSprite(&tft);
-#define TRANSPARENT_COLOR 0x0000
+int16_t screenW = SCREEN_WIDTH;
+int16_t screenH = SCREEN_HEIGHT;
+
+// Game state
+enum GameState {
+  STATE_MENU,
+  STATE_PLAYING,
+  STATE_GAME_OVER
+};
+
+GameState gameState = STATE_MENU;
+int8_t gameMode = GAME_MODE_1P;  // Current game mode
+int8_t menuSelection = 0;        // Current menu selection
+int8_t menuScreen = 0;           // 0 = game mode, 1 = difficulty, 2 = theme
+int8_t difficulty = 1;           // 0 = Easy, 1 = Medium, 2 = Hard
+int8_t theme = 0;                // 0 = Default, 1 = Spaceport, 2 = Minecraft
+int16_t ballSpeed = DIFFICULTY_MEDIUM;  // Current ball speed based on difficulty
+
+#if USE_BACKGROUND
+// Pointer to active background
+const uint16_t* activeBackground = background1;
 #endif
 
-int16_t h = SCREEN_HEIGHT;
-int16_t w = SCREEN_WIDTH;
+// Active theme colors
+uint16_t activeColorBall = THEME0_BALL;
+uint16_t activeColorPaddle1 = THEME0_PADDLE_P1;
+uint16_t activeColorPaddle2 = THEME0_PADDLE_P2;
 
-int16_t pady = 0;
-int16_t padh = PADDLE_WIDTH;
+// Paddle positions (Y coordinates)
+int16_t paddle1Y = 0;  // Left paddle (Player 1)
+int16_t paddle2Y = 0;  // Right paddle (Player 2 / AI)
 
-int dly = GAME_DELAY;
-int16_t s = BALL_SIZE;
+// Ball state
+int16_t ballX = 0;
+int16_t ballY = 0;
+int16_t ballDX = BALL_START_DX;
+int16_t ballDY = 1;
+int16_t ballFrame = 0;
 
-int16_t x = 0;
-int16_t y = 0;
-int16_t dx = 1;
-int16_t dy = 1;
+// Scores
+int16_t score1 = 0;  // Player 1 score
+int16_t score2 = 0;  // Player 2 / AI score
+int16_t lastScore1 = -1;
+int16_t lastScore2 = -1;
 
-int16_t ballSpeed = BALL_SPEED_START;  // Current ball speed (frame skip counter)
-int16_t ballFrame = 0;                  // Frame counter for ball movement
+// AI state
+int16_t aiReactionCounter = 0;
+int16_t aiTargetY = 0;
 
-#if USE_BALL_SPRITE
-float ballAngle = 0;                    // Ball rotation angle for rolling effect
-#define BALL_ROTATION_SPEED 0.25         // Degrees per pixel of movement
-#endif
+// Visual effects
+int16_t paddle1FlashFrames = 0;
+int16_t paddle2FlashFrames = 0;
+#define PADDLE_FLASH_DURATION 15
+#define COLOR_PADDLE_FLASH 0xFFFF
 
-int16_t score = 0;
-int16_t lastScore = -1;
+// Debounce for menu
+unsigned long lastButtonPress = 0;
+#define BUTTON_DEBOUNCE_MS 200
 
-int16_t paddleFlashFrames = 0;  // Frames remaining for paddle flash effect
-#define PADDLE_FLASH_DURATION 30   // How many frames the flash lasts
-#define COLOR_PADDLE_FLASH 0xFFFF // White flash color
+// Forward declarations
+void startGame();
+
+// ===========================================
+// Settings Storage (survives power off!)
+// ===========================================
+
+void loadSettings() {
+  preferences.begin("pong", true);  // Read-only mode
+  gameMode = preferences.getChar("mode", GAME_MODE_1P);
+  difficulty = preferences.getChar("diff", 1);  // Default: Medium
+  theme = preferences.getChar("theme", 0);      // Default: Default theme
+  preferences.end();
+  
+  // Validate loaded values
+  if (gameMode < 0 || gameMode > 1) gameMode = GAME_MODE_1P;
+  if (difficulty < 0 || difficulty > 2) difficulty = 1;
+  if (theme < 0 || theme > 2) theme = 0;
+  
+  // Apply difficulty
+  switch (difficulty) {
+    case 0: ballSpeed = DIFFICULTY_EASY; break;
+    case 1: ballSpeed = DIFFICULTY_MEDIUM; break;
+    case 2: ballSpeed = DIFFICULTY_HARD; break;
+  }
+  
+  // Apply theme background
+  #if USE_BACKGROUND
+  switch (theme) {
+    case 0: activeBackground = background1; break;
+    case 1: activeBackground = background2; break;
+    case 2: activeBackground = background3; break;
+  }
+  #endif
+  
+  // Apply theme colors
+  switch (theme) {
+    case 0:
+      activeColorBall = THEME0_BALL;
+      activeColorPaddle1 = THEME0_PADDLE_P1;
+      activeColorPaddle2 = THEME0_PADDLE_P2;
+      break;
+    case 1:
+      activeColorBall = THEME1_BALL;
+      activeColorPaddle1 = THEME1_PADDLE_P1;
+      activeColorPaddle2 = THEME1_PADDLE_P2;
+      break;
+    case 2:
+      activeColorBall = THEME2_BALL;
+      activeColorPaddle1 = THEME2_PADDLE_P1;
+      activeColorPaddle2 = THEME2_PADDLE_P2;
+      break;
+  }
+  
+  Serial.printf("[Settings] Loaded: mode=%d, diff=%d, theme=%d\n", gameMode, difficulty, theme);
+}
+
+void saveSettings() {
+  preferences.begin("pong", false);  // Read-write mode
+  preferences.putChar("mode", gameMode);
+  preferences.putChar("diff", difficulty);
+  preferences.putChar("theme", theme);
+  preferences.end();
+  Serial.printf("[Settings] Saved: mode=%d, diff=%d, theme=%d\n", gameMode, difficulty, theme);
+}
+
+// ===========================================
+// Helper Functions
+// ===========================================
 
 // Redraw a rectangle from the background image
 void clearWithBackground(int16_t rx, int16_t ry, int16_t rw, int16_t rh) {
 #if USE_BACKGROUND
   if (rx < 0) { rw += rx; rx = 0; }
   if (ry < 0) { rh += ry; ry = 0; }
-  if (rx + rw > w) rw = w - rx;
-  if (ry + rh > h) rh = h - ry;
+  if (rx + rw > screenW) rw = screenW - rx;
+  if (ry + rh > screenH) rh = screenH - ry;
   if (rw <= 0 || rh <= 0) return;
   
   tft.setSwapBytes(true);
   for (int16_t row = 0; row < rh; row++) {
     int32_t offset = (ry + row) * SCREEN_WIDTH + rx;
-    tft.pushImage(rx, ry + row, rw, 1, &background[offset]);
+    tft.pushImage(rx, ry + row, rw, 1, &activeBackground[offset]);
   }
   tft.setSwapBytes(false);
 #else
@@ -71,210 +167,600 @@ void clearWithBackground(int16_t rx, int16_t ry, int16_t rw, int16_t rh) {
 #endif
 }
 
-void drawScore() {
-  if (score != lastScore) {
-    // Clear previous score area (at left edge, rotated text area)
-    clearWithBackground(0, 0, SCORE_AREA_WIDTH, 100);
+// Check if a button is pressed (handles disabled pins)
+bool isButtonPressed(int pin) {
+  if (pin < 0) return false;
+  return digitalRead(pin) == LOW;
+}
+
+// ===========================================
+// Drawing Functions
+// ===========================================
+
+// Draw the center net (dashed line)
+void drawNet() {
+  int16_t centerX = screenW / 2 - NET_WIDTH / 2;
+  for (int16_t y = 0; y < screenH; y += NET_DASH_LENGTH + NET_DASH_GAP) {
+    int16_t dashLen = NET_DASH_LENGTH;
+    if (y + dashLen > screenH) dashLen = screenH - y;
+    tft.fillRect(centerX, y, NET_WIDTH, dashLen, NET_COLOR);
+  }
+}
+
+// Draw the background and net
+void drawBackground() {
+#if USE_BACKGROUND
+  tft.setSwapBytes(true);
+  tft.pushImage(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, activeBackground);
+  tft.setSwapBytes(false);
+#else
+  tft.fillScreen(COLOR_BG);
+#endif
+  drawNet();
+}
+
+// Draw scores at top of screen
+void drawScores() {
+  if (score1 != lastScore1 || score2 != lastScore2) {
+    // Clear score areas
+    clearWithBackground(screenW/4 - 20, 2, 40, 18);
+    clearWithBackground(3*screenW/4 - 20, 2, 40, 18);
     
-    // Temporarily switch to portrait rotation for text
-    tft.setRotation(0);
-    tft.setTextColor(TFT_BLACK);
+    // Draw scores
+    tft.setTextColor(COLOR_MENU_TEXT, COLOR_BG);
     tft.setTextSize(2);
-    tft.setCursor(5, 5);
-    tft.printf("Score:%d", score);
-    tft.setRotation(1);  // Back to landscape for game
     
-    lastScore = score;
+    // Player 1 score (left side)
+    tft.setCursor(screenW/4 - 10, 5);
+    tft.print(score1);
+    
+    // Player 2 / AI score (right side)
+    tft.setCursor(3*screenW/4 - 10, 5);
+    tft.print(score2);
+    
+    lastScore1 = score1;
+    lastScore2 = score2;
   }
 }
 
-void resetBall() {
-  x = SCORE_AREA_WIDTH;  // Start after score area
-  y = 0;                  // Start at top of screen
-  dx = 1;
-  // Random starting angle, always start moving downward
-  dy = random(1, BALL_MAX_DY + 1);
-  ballSpeed = BALL_SPEED_START;
-  ballFrame = 0;
+// Draw a paddle
+void drawPaddle(int16_t x, int16_t y, uint16_t color) {
+  tft.fillRect(x, y, PADDLE_HEIGHT, PADDLE_WIDTH, color);
 }
 
-void ball() {
-  // Ball went past paddle - reset at far left
-  if (x > w + s) {
-    // Player missed - deduct a point (minimum 0)
-    if (score > 0) score--;
-    onScoreLost();  // EVENT: Player lost a point!
-    resetBall();
-  }
+// Draw the ball (filled circle)
+void drawBall(int16_t x, int16_t y) {
+  tft.fillCircle(x, y, BALL_RADIUS, activeColorBall);
+}
 
-  // Only move ball every 'ballSpeed' frames (lower = faster)
-  ballFrame++;
-  if (ballFrame < ballSpeed) {
-    return;
-  }
-  ballFrame = 0;
+// Clear ball area
+void clearBall(int16_t x, int16_t y) {
+  clearWithBackground(x - BALL_RADIUS - 1, y - BALL_RADIUS - 1, 
+                      BALL_RADIUS * 2 + 2, BALL_RADIUS * 2 + 2);
+}
 
-#if USE_BALL_SPRITE
-  // Clear larger area to account for rotated sprite bounds (diagonal = s * sqrt(2))
-  int16_t clearPad = 8;  // Extra padding for rotation
-  clearWithBackground(x - clearPad, y - clearPad, s + clearPad * 2, s + clearPad * 2);
-#else
-  clearWithBackground(x, y, s, s);
-#endif
-  x = x + dx;
-  y = y + dy;
+// ===========================================
+// Menu System
+// ===========================================
+
+void drawMenu() {
+  tft.fillScreen(COLOR_MENU_BG);
   
-#if USE_BALL_SPRITE
-  // Update ball rotation based on velocity (simulate rolling)
-  // Positive dx = moving right = clockwise rotation
-  float speed = sqrt((float)(dx * dx + dy * dy));
-  ballAngle += dx > 0 ? speed * BALL_ROTATION_SPEED : -speed * BALL_ROTATION_SPEED;
-  // Keep angle in 0-360 range
-  if (ballAngle >= 360) ballAngle -= 360;
-  if (ballAngle < 0) ballAngle += 360;
+  // Title
+  tft.setTextColor(COLOR_MENU_TEXT);
+  tft.setTextSize(3);
+  tft.setCursor(70, 20);
+  tft.print("PONG");
   
-  // Set pivot point on TFT where sprite center should appear
-  tft.setPivot(x + s/2, y + s/2);
-  // Push rotated sprite centered on pivot
-  ballSprite.pushRotated((int16_t)ballAngle, TRANSPARENT_COLOR);
-#else
-  tft.fillRect(x, y, s, s, COLOR_BALL);
-#endif
-
-  // Collision box coordinates (relative to screen)
-  int16_t cx = x + BALL_COLLISION_X;
-  int16_t cy = y + BALL_COLLISION_Y;
-  int16_t cw = BALL_COLLISION_W;
-  int16_t ch = BALL_COLLISION_H;
-
-  // Top/bottom wall collision
-  if (cy + ch >= h) {
-    y = h - BALL_COLLISION_Y - ch;
-    dy = -dy;
-    onWallBounce();  // EVENT: Ball hit bottom wall!
+  tft.setTextSize(2);
+  
+  if (menuScreen == 0) {
+    // Game Mode Selection
+    // Quick Play option (uses saved settings)
+    if (menuSelection == 0) {
+      tft.setTextColor(COLOR_MENU_SELECT);
+      tft.setCursor(40, 50);
+      tft.print("> Quick Play");
+    } else {
+      tft.setTextColor(0x07FF);  // Cyan
+      tft.setCursor(50, 50);
+      tft.print("Quick Play");
+    }
+    
+    // 1 Player option
+    if (menuSelection == 1) {
+      tft.setTextColor(COLOR_MENU_SELECT);
+      tft.setCursor(40, 75);
+      tft.print("> 1 Player");
+    } else {
+      tft.setTextColor(COLOR_MENU_TEXT);
+      tft.setCursor(50, 75);
+      tft.print("1 Player");
+    }
+    
+    // 2 Players option
+    if (menuSelection == 2) {
+      tft.setTextColor(COLOR_MENU_SELECT);
+      tft.setCursor(40, 100);
+      tft.print("> 2 Players");
+    } else {
+      tft.setTextColor(COLOR_MENU_TEXT);
+      tft.setCursor(50, 100);
+      tft.print("2 Players");
+    }
+  } else if (menuScreen == 1) {
+    // Difficulty Selection
+    tft.setTextSize(1);
+    tft.setTextColor(0x7BEF);
+    tft.setCursor(65, 45);
+    tft.print("Select Difficulty");
+    tft.setTextSize(2);
+    
+    // Easy
+    if (menuSelection == 0) {
+      tft.setTextColor(COLOR_MENU_SELECT);
+      tft.setCursor(50, 60);
+      tft.print("> Easy");
+    } else {
+      tft.setTextColor(0x07E0);  // Green
+      tft.setCursor(60, 60);
+      tft.print("Easy");
+    }
+    
+    // Medium
+    if (menuSelection == 1) {
+      tft.setTextColor(COLOR_MENU_SELECT);
+      tft.setCursor(50, 80);
+      tft.print("> Medium");
+    } else {
+      tft.setTextColor(0xFFE0);  // Yellow
+      tft.setCursor(60, 80);
+      tft.print("Medium");
+    }
+    
+    // Hard
+    if (menuSelection == 2) {
+      tft.setTextColor(COLOR_MENU_SELECT);
+      tft.setCursor(50, 100);
+      tft.print("> Hard");
+    } else {
+      tft.setTextColor(0xF800);  // Red
+      tft.setCursor(60, 100);
+      tft.print("Hard");
+    }
+  } else {
+    // Theme Selection
+    tft.setTextSize(1);
+    tft.setTextColor(0x7BEF);
+    tft.setCursor(70, 45);
+    tft.print("Select Theme");
+    tft.setTextSize(2);
+    
+    // Default
+    if (menuSelection == 0) {
+      tft.setTextColor(COLOR_MENU_SELECT);
+      tft.setCursor(50, 60);
+      tft.print("> Default");
+    } else {
+      tft.setTextColor(0xBEDF);  // Light blue
+      tft.setCursor(60, 60);
+      tft.print("Default");
+    }
+    
+    // Spaceport
+    if (menuSelection == 1) {
+      tft.setTextColor(COLOR_MENU_SELECT);
+      tft.setCursor(50, 80);
+      tft.print("> Spaceport");
+    } else {
+      tft.setTextColor(0x4A69);  // Dark blue
+      tft.setCursor(60, 80);
+      tft.print("Spaceport");
+    }
+    
+    // Minecraft
+    if (menuSelection == 2) {
+      tft.setTextColor(COLOR_MENU_SELECT);
+      tft.setCursor(50, 100);
+      tft.print("> Minecraft");
+    } else {
+      tft.setTextColor(0x07E0);  // Green
+      tft.setCursor(60, 100);
+      tft.print("Minecraft");
+    }
   }
-  if (cy <= 0) {
-    y = -BALL_COLLISION_Y;
-    dy = -dy;
-    onWallBounce();  // EVENT: Ball hit top wall!
-  }
+  
+  // Instructions
+  tft.setTextSize(1);
+  tft.setTextColor(0x7BEF);  // Gray
+  tft.setCursor(45, 120);
+  tft.print("Press button to select");
+}
 
-  // Left wall collision (respect score area)
-  if (cx <= SCORE_AREA_WIDTH) {
-    x = SCORE_AREA_WIDTH - BALL_COLLISION_X;
-    dx = -dx;
-    onWallBounce();  // EVENT: Ball hit left wall!
+void handleMenu() {
+  unsigned long now = millis();
+  if (now - lastButtonPress < BUTTON_DEBOUNCE_MS) return;
+  
+  // Navigate menu
+  if (isButtonPressed(P1_UP_BUTTON) || isButtonPressed(EXT_P1_UP)) {
+    if (menuScreen == 0) {
+      menuSelection = (menuSelection + 1) % 3;  // 3 options: Quick Play, 1P, 2P
+    } else {
+      menuSelection = (menuSelection + 1) % 3;  // 3 options for difficulty/theme
+    }
+    lastButtonPress = now;
+    drawMenu();
   }
-
-  // Paddle collision - only count hits on the front face (ball moving towards paddle)
-  // Ball center must be within paddle range (no side clips)
-  // Also ensure ball hasn't already passed behind the paddle
-  if (dx > 0 && cx + cw >= w - PADDLE_OFFSET - PADDLE_HEIGHT && cx < w - PADDLE_OFFSET) {
-    int ballCenter = cy + ch / 2;
-    // Only score if ball center is within paddle's vertical range
-    if (ballCenter >= pady && ballCenter <= pady + padh) {
-      x = w - PADDLE_OFFSET - PADDLE_HEIGHT - BALL_COLLISION_X - cw;  // Push ball back
-      dx = -dx;
-      // Increase ball speed on paddle hit
-      if (ballSpeed > BALL_SPEED_MIN) {
-        ballSpeed -= BALL_SPEED_INC;
-      }
-      score++;
-      paddleFlashFrames = PADDLE_FLASH_DURATION;  // Trigger flash effect
-      onPaddleHit();        // EVENT: Ball hit the paddle!
-      onScoreGained(score); // EVENT: Player scored a point!
-      
-      // Add spin based on where ball center hits paddle
-      int paddleCenter = pady + padh / 2;
-      if (ballCenter > paddleCenter) {
-        dy = random(1, BALL_MAX_DY + 1);  // Hit bottom half - bounce down
+  
+  if (isButtonPressed(P1_DOWN_BUTTON) || isButtonPressed(EXT_P1_DOWN)) {
+    lastButtonPress = now;
+    
+    if (menuScreen == 0) {
+      if (menuSelection == 0) {
+        // Quick Play - use saved settings and start immediately
+        gameState = STATE_PLAYING;
+        startGame();
       } else {
-        dy = -random(1, BALL_MAX_DY + 1); // Hit top half - bounce up
+        // Game mode selected (1=1P, 2=2P), go to difficulty screen
+        gameMode = menuSelection - 1;  // Adjust for Quick Play offset
+        menuScreen = 1;
+        menuSelection = difficulty;  // Use saved difficulty as default
+        drawMenu();
       }
+    } else if (menuScreen == 1) {
+      // Difficulty selected, go to theme screen
+      difficulty = menuSelection;
+      
+      // Set ball speed based on difficulty
+      switch (difficulty) {
+        case 0: ballSpeed = DIFFICULTY_EASY; break;
+        case 1: ballSpeed = DIFFICULTY_MEDIUM; break;
+        case 2: ballSpeed = DIFFICULTY_HARD; break;
+      }
+      
+      menuScreen = 2;
+      menuSelection = theme;  // Use saved theme as default
+      drawMenu();
+    } else {
+      // Theme selected, start game
+      theme = menuSelection;
+      
+      // Set active background based on theme
+      #if USE_BACKGROUND
+      switch (theme) {
+        case 0: activeBackground = background1; break;
+        case 1: activeBackground = background2; break;
+        case 2: activeBackground = background3; break;
+      }
+      #endif
+      
+      // Set colors based on theme
+      switch (theme) {
+        case 0:  // Default
+          activeColorBall = THEME0_BALL;
+          activeColorPaddle1 = THEME0_PADDLE_P1;
+          activeColorPaddle2 = THEME0_PADDLE_P2;
+          break;
+        case 1:  // Spaceport
+          activeColorBall = THEME1_BALL;
+          activeColorPaddle1 = THEME1_PADDLE_P1;
+          activeColorPaddle2 = THEME1_PADDLE_P2;
+          break;
+        case 2:  // Minecraft
+          activeColorBall = THEME2_BALL;
+          activeColorPaddle1 = THEME2_PADDLE_P1;
+          activeColorPaddle2 = THEME2_PADDLE_P2;
+          break;
+      }
+      
+      gameState = STATE_PLAYING;
+      menuScreen = 0;  // Reset for next time
+      menuSelection = 0;
+      saveSettings();  // Save selections for next time
+      startGame();
     }
   }
 }
 
-// Helper to check if a button is pressed (handles disabled pins)
-bool isButtonPressed(int pin) {
-  if (pin < 0) return false;
-  return digitalRead(pin) == 0;
+// ===========================================
+// Game Logic
+// ===========================================
+
+void resetBall() {
+  ballX = screenW / 2;
+  ballY = screenH / 2;
+  
+  // Alternate direction based on who scored last
+  ballDX = (random(2) == 0) ? BALL_START_DX : -BALL_START_DX;
+  ballDY = random(-BALL_MAX_DY, BALL_MAX_DY + 1);
+  if (ballDY == 0) ballDY = 1;
+  
+  ballFrame = 0;
 }
 
-void paddle() {
-  // Clear wider area to ensure old paddle pixels are removed
-  clearWithBackground(w - PADDLE_OFFSET - 6, pady, 6, padh);
+void startGame() {
+  // Reset scores
+  score1 = 0;
+  score2 = 0;
+  lastScore1 = -1;
+  lastScore2 = -1;
   
-  // Move paddle only while button is pressed (no inertia)
-  // Check both onboard AND external buttons
-  if ((isButtonPressed(LEFT_BUTTON) || isButtonPressed(EXT_BUTTON_DOWN)) && pady + padh < h) {
-    pady += PADDLE_SPEED;
-  }
-  if ((isButtonPressed(RIGHT_BUTTON) || isButtonPressed(EXT_BUTTON_UP)) && pady > 0) {
-    pady -= PADDLE_SPEED;
-  }
+  // Center paddles
+  paddle1Y = (screenH - PADDLE_WIDTH) / 2;
+  paddle2Y = (screenH - PADDLE_WIDTH) / 2;
   
-  // Clamp paddle to screen bounds
-  if (pady < 0) pady = 0;
-  if (pady + padh > h) pady = h - padh;
+  // Reset AI
+  aiReactionCounter = 0;
+  aiTargetY = screenH / 2;
   
-  // Draw paddle with flash effect when hit
-  uint16_t paddleColor = COLOR_PADDLE;
-  if (paddleFlashFrames > 0) {
-    paddleColor = COLOR_PADDLE_FLASH;
-    paddleFlashFrames--;
-  }
-  tft.fillRect(w - PADDLE_OFFSET - PADDLE_HEIGHT, pady, PADDLE_HEIGHT, padh, paddleColor);
+  // Draw initial state
+  drawBackground();
+  drawScores();
+  
+  // Draw paddles
+  drawPaddle(PADDLE_OFFSET, paddle1Y, activeColorPaddle1);
+  drawPaddle(screenW - PADDLE_OFFSET - PADDLE_HEIGHT, paddle2Y, activeColorPaddle2);
+  
+  resetBall();
 }
+
+void updatePaddle1() {
+  int16_t oldY = paddle1Y;
+  
+  // Move paddle based on input
+  if (isButtonPressed(P1_UP_BUTTON) || isButtonPressed(EXT_P1_UP)) {
+    paddle1Y -= PADDLE_SPEED;
+  }
+  if (isButtonPressed(P1_DOWN_BUTTON) || isButtonPressed(EXT_P1_DOWN)) {
+    paddle1Y += PADDLE_SPEED;
+  }
+  
+  // Clamp to screen bounds
+  if (paddle1Y < 0) paddle1Y = 0;
+  if (paddle1Y + PADDLE_WIDTH > screenH) paddle1Y = screenH - PADDLE_WIDTH;
+  
+  // Redraw if moved
+  if (oldY != paddle1Y) {
+    clearWithBackground(PADDLE_OFFSET, oldY, PADDLE_HEIGHT, PADDLE_WIDTH);
+    
+    uint16_t color = activeColorPaddle1;
+    if (paddle1FlashFrames > 0) {
+      color = COLOR_PADDLE_FLASH;
+      paddle1FlashFrames--;
+    }
+    drawPaddle(PADDLE_OFFSET, paddle1Y, color);
+  } else if (paddle1FlashFrames > 0) {
+    paddle1FlashFrames--;
+    drawPaddle(PADDLE_OFFSET, paddle1Y, 
+               paddle1FlashFrames > 0 ? COLOR_PADDLE_FLASH : activeColorPaddle1);
+  }
+}
+
+void updatePaddle2() {
+  int16_t oldY = paddle2Y;
+  
+  if (gameMode == GAME_MODE_2P) {
+    // Human player 2
+    if (isButtonPressed(P2_UP_BUTTON) || isButtonPressed(EXT_P2_UP)) {
+      paddle2Y -= PADDLE_SPEED;
+    }
+    if (isButtonPressed(P2_DOWN_BUTTON) || isButtonPressed(EXT_P2_DOWN)) {
+      paddle2Y += PADDLE_SPEED;
+    }
+  } else {
+    // AI control
+    aiReactionCounter++;
+    if (aiReactionCounter >= AI_REACTION_DELAY) {
+      aiReactionCounter = 0;
+      
+      // AI tracks the ball when it's moving toward the AI paddle
+      if (ballDX > 0) {
+        aiTargetY = ballY + random(-AI_ERROR_MARGIN, AI_ERROR_MARGIN + 1);
+      }
+    }
+    
+    // Move toward target
+    int16_t paddleCenter = paddle2Y + PADDLE_WIDTH / 2;
+    if (paddleCenter < aiTargetY - 2) {
+      paddle2Y += AI_SPEED;
+    } else if (paddleCenter > aiTargetY + 2) {
+      paddle2Y -= AI_SPEED;
+    }
+  }
+  
+  // Clamp to screen bounds
+  if (paddle2Y < 0) paddle2Y = 0;
+  if (paddle2Y + PADDLE_WIDTH > screenH) paddle2Y = screenH - PADDLE_WIDTH;
+  
+  // Redraw if moved
+  if (oldY != paddle2Y) {
+    clearWithBackground(screenW - PADDLE_OFFSET - PADDLE_HEIGHT, oldY, 
+                        PADDLE_HEIGHT, PADDLE_WIDTH);
+    
+    uint16_t color = activeColorPaddle2;
+    if (paddle2FlashFrames > 0) {
+      color = COLOR_PADDLE_FLASH;
+      paddle2FlashFrames--;
+    }
+    drawPaddle(screenW - PADDLE_OFFSET - PADDLE_HEIGHT, paddle2Y, color);
+  } else if (paddle2FlashFrames > 0) {
+    paddle2FlashFrames--;
+    drawPaddle(screenW - PADDLE_OFFSET - PADDLE_HEIGHT, paddle2Y,
+               paddle2FlashFrames > 0 ? COLOR_PADDLE_FLASH : activeColorPaddle2);
+  }
+}
+
+void updateBall() {
+  // Only move ball every 'ballSpeed' frames
+  ballFrame++;
+  if (ballFrame < ballSpeed) return;
+  ballFrame = 0;
+  
+  // Clear old ball position
+  clearBall(ballX, ballY);
+  
+  // Redraw net section if ball was near center
+  if (abs(ballX - screenW/2) < BALL_RADIUS + NET_WIDTH) {
+    int16_t netX = screenW / 2 - NET_WIDTH / 2;
+    for (int16_t y = ballY - BALL_RADIUS - 2; y < ballY + BALL_RADIUS + 2; y += NET_DASH_LENGTH + NET_DASH_GAP) {
+      if (y >= 0 && y < screenH) {
+        int16_t dashY = (y / (NET_DASH_LENGTH + NET_DASH_GAP)) * (NET_DASH_LENGTH + NET_DASH_GAP);
+        tft.fillRect(netX, dashY, NET_WIDTH, NET_DASH_LENGTH, NET_COLOR);
+      }
+    }
+  }
+  
+  // Move ball
+  ballX += ballDX;
+  ballY += ballDY;
+  
+  // Top/bottom wall collision
+  if (ballY - BALL_RADIUS <= 0) {
+    ballY = BALL_RADIUS;
+    ballDY = -ballDY;
+    onWallBounce();
+  }
+  if (ballY + BALL_RADIUS >= screenH) {
+    ballY = screenH - BALL_RADIUS;
+    ballDY = -ballDY;
+    onWallBounce();
+  }
+  
+  // Left paddle (Player 1) collision
+  if (ballDX < 0 && 
+      ballX - BALL_RADIUS <= PADDLE_OFFSET + PADDLE_HEIGHT &&
+      ballX + BALL_RADIUS >= PADDLE_OFFSET) {
+    if (ballY >= paddle1Y && ballY <= paddle1Y + PADDLE_WIDTH) {
+      ballX = PADDLE_OFFSET + PADDLE_HEIGHT + BALL_RADIUS;
+      ballDX = -ballDX;
+      
+      // Add spin based on hit location
+      int16_t hitPos = ballY - (paddle1Y + PADDLE_WIDTH / 2);
+      ballDY = hitPos / 4;
+      if (ballDY == 0) ballDY = (random(2) == 0) ? 1 : -1;
+      if (ballDY > BALL_MAX_DY) ballDY = BALL_MAX_DY;
+      if (ballDY < -BALL_MAX_DY) ballDY = -BALL_MAX_DY;
+      
+      paddle1FlashFrames = PADDLE_FLASH_DURATION;
+      onPaddleHit();
+    }
+  }
+  
+  // Right paddle (Player 2 / AI) collision
+  if (ballDX > 0 && 
+      ballX + BALL_RADIUS >= screenW - PADDLE_OFFSET - PADDLE_HEIGHT &&
+      ballX - BALL_RADIUS <= screenW - PADDLE_OFFSET) {
+    if (ballY >= paddle2Y && ballY <= paddle2Y + PADDLE_WIDTH) {
+      ballX = screenW - PADDLE_OFFSET - PADDLE_HEIGHT - BALL_RADIUS;
+      ballDX = -ballDX;
+      
+      // Add spin based on hit location
+      int16_t hitPos = ballY - (paddle2Y + PADDLE_WIDTH / 2);
+      ballDY = hitPos / 4;
+      if (ballDY == 0) ballDY = (random(2) == 0) ? 1 : -1;
+      if (ballDY > BALL_MAX_DY) ballDY = BALL_MAX_DY;
+      if (ballDY < -BALL_MAX_DY) ballDY = -BALL_MAX_DY;
+      
+      paddle2FlashFrames = PADDLE_FLASH_DURATION;
+      onPaddleHit();
+    }
+  }
+  
+  // Scoring - ball goes past left paddle
+  if (ballX < -BALL_RADIUS) {
+    score2++;
+    onScoreLost();
+    drawScores();
+    delay(500);
+    resetBall();
+  }
+  
+  // Scoring - ball goes past right paddle
+  if (ballX > screenW + BALL_RADIUS) {
+    score1++;
+    onScoreGained(score1);
+    drawScores();
+    delay(500);
+    resetBall();
+  }
+  
+  // Draw ball at new position
+  drawBall(ballX, ballY);
+}
+
+// ===========================================
+// Setup and Loop
+// ===========================================
 
 void setup() {
-  // Initialize serial for debug output
   Serial.begin(115200);
-  Serial.println("\n[Setup] Starting...");
+  Serial.println("\n[Setup] Pong Game Starting...");
+  
+  // Load saved settings
+  loadSettings();
   
   // Turn on backlight
   pinMode(TFT_BL, OUTPUT);
   digitalWrite(TFT_BL, HIGH);
   
+  // Initialize display (landscape orientation)
   tft.init();
   tft.setRotation(1);
-  tft.fillScreen(TFT_BLACK);  // Clear entire display first
+  tft.fillScreen(TFT_BLACK);
   
-#if USE_BACKGROUND
-  tft.setSwapBytes(true);
-  tft.pushImage(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, background);
-  tft.setSwapBytes(false);
-#else
-  tft.fillScreen(COLOR_BG);
-#endif
-  tft.setTextColor(COLOR_PADDLE, COLOR_BG);
+  // Initialize buttons
+  pinMode(P1_UP_BUTTON, INPUT_PULLUP);
+  pinMode(P1_DOWN_BUTTON, INPUT_PULLUP);
   
-  pinMode(LEFT_BUTTON, INPUT_PULLUP);
-  pinMode(RIGHT_BUTTON, INPUT_PULLUP);
-  
-  // Initialize external button pins (if enabled)
-  #if EXT_BUTTON_DOWN >= 0
-    pinMode(EXT_BUTTON_DOWN, INPUT_PULLUP);
+  #if EXT_P1_UP >= 0
+    pinMode(EXT_P1_UP, INPUT_PULLUP);
   #endif
-  #if EXT_BUTTON_UP >= 0
-    pinMode(EXT_BUTTON_UP, INPUT_PULLUP);
+  #if EXT_P1_DOWN >= 0
+    pinMode(EXT_P1_DOWN, INPUT_PULLUP);
+  #endif
+  #if P2_UP_BUTTON >= 0
+    pinMode(P2_UP_BUTTON, INPUT_PULLUP);
+  #endif
+  #if P2_DOWN_BUTTON >= 0
+    pinMode(P2_DOWN_BUTTON, INPUT_PULLUP);
+  #endif
+  #if EXT_P2_UP >= 0
+    pinMode(EXT_P2_UP, INPUT_PULLUP);
+  #endif
+  #if EXT_P2_DOWN >= 0
+    pinMode(EXT_P2_DOWN, INPUT_PULLUP);
   #endif
   
-  setupEventPins();  // Initialize event hook GPIO pins
+  setupEventPins();
   
-#if USE_BALL_SPRITE
-  ballSprite.createSprite(BALL_SIZE, BALL_SIZE);
-  ballSprite.setSwapBytes(true);
-  ballSprite.pushImage(0, 0, BALL_SIZE, BALL_SIZE, forever_alone);
-#endif
-  
-  resetBall();
+  // Show menu with Quick Play as default option
+  menuSelection = 0;  // Start with Quick Play highlighted
+  drawMenu();
+  Serial.println("[Setup] Ready - showing menu");
 }
 
 void loop() {
-  delay(dly);
-  updateEventPins();  // Turn off event pins after pulse duration
-  paddle();
-  ball();
-  drawScore();
+  delay(GAME_DELAY);
+  updateEventPins();
+  
+  switch (gameState) {
+    case STATE_MENU:
+      handleMenu();
+      break;
+      
+    case STATE_PLAYING:
+      updatePaddle1();
+      updatePaddle2();
+      updateBall();
+      break;
+      
+    case STATE_GAME_OVER:
+      // Could add game over screen here
+      // For now, return to menu on button press
+      if (isButtonPressed(P1_UP_BUTTON) || isButtonPressed(P1_DOWN_BUTTON)) {
+        gameState = STATE_MENU;
+        drawMenu();
+      }
+      break;
+  }
 }
