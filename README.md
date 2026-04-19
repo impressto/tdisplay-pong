@@ -42,20 +42,76 @@ A fun pong game for the TTGO T-Display with sound effects. Choose your sound mod
 ## How to Play
 
 ### Onboard Buttons
-1. **Left Button (GPIO 0)** - Move paddle LEFT
-2. **Right Button (GPIO 35)** - Move paddle RIGHT
+1. **Left Button (GPIO 0)** - Move paddle UP
+2. **Right Button (GPIO 35)** - Move paddle DOWN
 
-### External Buttons (Optional)
-You can add your own buttons for a better gaming experience!
-- **GPIO 25** - External button to move paddle LEFT
-- **GPIO 13** - External button to move paddle RIGHT
+### External Buttons for 2-Player Mode
 
-**Wiring external buttons:**
+To play **Human vs Human**, you need 4 external buttons — 2 for each player!
+
+#### Wiring Diagram
+
+All 4 buttons connect to the **right side** of the board, close to GND:
+
 ```
-Button leg 1 -----> GPIO pin (25 or 13)
-Button leg 2 -----> GND
+        T-Display (clone) - Right Side Pins
+        ┌────────────────────────────────┐
+        │            [USB-C]              │
+        │                                 │
+        │                          3V  ○ │
+        │                       GPIO36 ○ │
+        │                       GPIO37 ○ │
+        │                       GPIO38 ○ │
+        │                       GPIO39 ○ │
+        │   P1 UP  [BTN]─────── GPIO32 ● │
+        │   P1 DOWN[BTN]─────── GPIO33 ● │
+        │   P2 UP  [BTN]─────── GPIO25 ● │
+        │   P2 DOWN[BTN]─────── GPIO26 ● │
+        │                       GPIO27 ○ │
+        │   All buttons ───────── GND ● │
+        │                           5V ○ │
+        │           [SCREEN]             │
+        └────────────────────────────────┘
+        ● = used    ○ = not used
 ```
-No resistor needed - the ESP32 has internal pull-up resistors!
+
+#### Pin Assignments
+
+| Player | Action | GPIO Pin | Position (top to bottom) |
+|--------|--------|----------|-------------------------|
+| **Player 1** (Left paddle) | UP | GPIO 32 | 1st button |
+| **Player 1** (Left paddle) | DOWN | GPIO 33 | 2nd button |
+| **Player 2** (Right paddle) | UP | GPIO 25 | 3rd button |
+| **Player 2** (Right paddle) | DOWN | GPIO 26 | 4th button |
+| All buttons | Ground | GND | Right below GPIO27 |
+
+#### How to Wire Each Button
+
+```
+Button          T-Display
+┌─────┐
+│     │
+│ ┌─┐ │ Leg 1 ────────► GPIO pin (32, 33, 25, or 26)
+│ └─┘ │
+│     │ Leg 2 ────────► GND (any GND pin)
+└─────┘
+```
+
+**Tips:**
+- No resistors needed! The ESP32 has internal pull-up resistors.
+- All 4 buttons share the same GND — you can daisy-chain them.
+- Test each button before gluing anything down!
+
+#### Enable 2-Player Mode in config.h
+
+Make sure the Player 2 pins are set (they should be by default):
+
+```c
+#define EXT_P1_UP         32   // Player 1 UP
+#define EXT_P1_DOWN       33   // Player 1 DOWN
+#define EXT_P2_UP         25   // Player 2 UP
+#define EXT_P2_DOWN       26   // Player 2 DOWN
+```
 
 ### Gameplay
 - Hit the ball with your paddle to score points!
@@ -265,20 +321,61 @@ void onScoreLost() {
 
 Here are the GPIO pins used in this project:
 
+### Right Side (Buttons)
+
 | Pin | Usage | Notes |
 |-----|-------|-------|
-| 0 | Left button | Onboard button |
-| 13 | External button | Default: External LEFT button |
-| 15 | ISD1820 P-E | Trigger pin (when ISD1820 enabled) |
-| 17 | DFPlayer TX | Serial TX to DFPlayer RX (when DFPlayer enabled) |
-| 21 | DFPlayer RX | Serial RX from DFPlayer TX (when DFPlayer enabled) |
-| 22 | DFPlayer BUSY | Optional: detect when DFPlayer is playing |
-| 25 | External button | Default: External RIGHT button |
-| 26 | Event pin | Ball wall bounce |
-| 27 | Event pin | Ball paddle hit |
-| 32 | Event pin | Score gained |
-| 33 | Event pin | Score lost |
-| 35 | Right button | Onboard button (input only) |
+| 32 | P1 UP button | Player 1 paddle up |
+| 33 | P1 DOWN button | Player 1 paddle down |
+| 25 | P2 UP button | Player 2 paddle up |
+| 26 | P2 DOWN button | Player 2 paddle down |
+| GND | Ground | Shared by all buttons |
+
+### Left Side (LEDs, Buzzer, Sound Modules)
+
+| Pin | Usage | Notes |
+|-----|-------|-------|
+| 2 | Event LED | Score gained |
+| 12 | Event LED | Wall bounce |
+| 13 | Event LED | Paddle hit |
+| 15 | Buzzer / ISD1820 | PWM buzzer or ISD1820 P-E pin |
+| 17 | Event LED / DFPlayer TX | Score lost (or DFPlayer serial) |
+| 21 | DFPlayer RX | Serial RX from DFPlayer TX |
+| 22 | DFPlayer BUSY | Optional: detect when playing |
+
+### Onboard Buttons
+
+| Pin | Usage | Notes |
+|-----|-------|-------|
+| 0 | Left button | Menu / P1 up (onboard) |
+| 35 | Right button | Menu / P1 down (input only) |
+
+### Wiring Overview
+
+```
+         T-Display (clone) - Both Sides
+
+    LEFT SIDE                      RIGHT SIDE
+    (LEDs/Buzzer)                  (Buttons)
+    ┌───────────────────────────────────┐
+    │           [USB-C]              │
+    │                                │
+    │ ○ GND                   3V  ○ │
+    │ ○ GND                GPIO36 ○ │
+    │ ○ 21                 GPIO37 ○ │
+    │ ○ 22                 GPIO38 ○ │
+    │ ● 17 (Score Lost)    GPIO39 ○ │
+    │ ● 2  (Score Gained)  GPIO32 ● │ P1 UP
+    │ ● 15 (Buzzer)        GPIO33 ● │ P1 DOWN
+    │ ● 13 (Paddle Hit)    GPIO25 ● │ P2 UP
+    │ ● 12 (Wall Bounce)   GPIO26 ● │ P2 DOWN
+    │ ○ GND                GPIO27 ○ │
+    │ ○ GND                  GND ● │ All buttons
+    │ ○ 3V                   5V  ○ │
+    │           [SCREEN]            │
+    └───────────────────────────────────┘
+    ● = used    ○ = available
+```
 
 ## Troubleshooting
 

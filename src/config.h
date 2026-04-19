@@ -42,10 +42,10 @@
 //
 // Set to -1 to disable external buttons
 // ===========================================
-#define EXT_P1_UP         13   // External button - Player 1 paddle up
-#define EXT_P1_DOWN       25   // External button - Player 1 paddle down
-#define EXT_P2_UP         -1   // External button - Player 2 paddle up
-#define EXT_P2_DOWN       -1   // External button - Player 2 paddle down
+#define EXT_P1_UP         32   // External button - Player 1 paddle up
+#define EXT_P1_DOWN       33   // External button - Player 1 paddle down
+#define EXT_P2_UP         25   // External button - Player 2 paddle up
+#define EXT_P2_DOWN       26   // External button - Player 2 paddle down
 
 // --- Paddle Settings ---
 #define PADDLE_WIDTH   30   // Length of paddle (vertical)
@@ -167,12 +167,14 @@
 // - Motor: Pin -> Transistor base (with resistor)
 //
 // Set to -1 to disable a pin
+// NOTE: Button pins (32, 33, 25, 26) are on the RIGHT side.
+//       Event LED pins use the LEFT side of the board.
 // ===========================================
 
-#define PIN_WALL_BOUNCE    26   // Fires when ball bounces off any wall
-#define PIN_PADDLE_HIT     27   // Fires when ball hits the paddle
-#define PIN_SCORE_GAINED   32   // Fires when player scores a point
-#define PIN_SCORE_LOST     33   // Fires when player misses the ball
+#define PIN_WALL_BOUNCE    12   // Fires when ball bounces off any wall
+#define PIN_PADDLE_HIT     13   // Fires when ball hits the paddle
+#define PIN_SCORE_GAINED   2    // Fires when player scores a point
+#define PIN_SCORE_LOST     17   // Fires when player misses the ball
 
 // --- Event Pulse Duration ---
 #define EVENT_PULSE_MS     50   // How long pins stay HIGH (milliseconds)
