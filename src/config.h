@@ -8,6 +8,7 @@
 // --- Game Mode ---
 #define GAME_MODE_1P       0    // Human vs AI
 #define GAME_MODE_2P       1    // Human vs Human
+#define GAME_MODE_DEMO     2    // AI vs AI (Demo mode)
 
 // --- Display Settings (Landscape orientation) ---
 #define SCREEN_WIDTH   240
@@ -198,7 +199,7 @@
 //
 // Set DFPLAYER_ENABLED to 0 to disable
 // ===========================================
-#define DFPLAYER_ENABLED   1     // 1 = enable DFPlayer, 0 = disable
+#define DFPLAYER_ENABLED   0     // 1 = enable DFPlayer, 0 = disable (using buzzer)
 #define DFPLAYER_TX_PIN    17    // ESP32 TX -> DFPlayer RX
 #define DFPLAYER_RX_PIN    21    // ESP32 RX <- DFPlayer TX
 #define DFPLAYER_BUSY_PIN  22    // ESP32 <- DFPlayer BUSY (LOW = playing)
@@ -256,5 +257,44 @@
 // Choose which events trigger the ISD1820 (1 = yes, 0 = no)
 #define ISD1820_TRIGGER_PADDLE_HIT  1    // Play sound on paddle hit
 #define ISD1820_TRIGGER_SCORE_LOST  1    // Play sound when player misses the ball
+
+// ===========================================
+// Passive Buzzer (9042) Configuration
+// ===========================================
+// A simple passive buzzer that uses PWM to generate tones.
+// The 9042 is a popular passive buzzer for ESP32 projects.
+//
+// Wiring Guide:
+// - Buzzer (+) -> ESP32 GPIO pin
+// - Buzzer (-) -> GND
+//
+// NOTE: Only ONE sound module should be active at a time!
+//       Set DFPLAYER_ENABLED and ISD1820_ENABLED to 0 when using buzzer.
+// ===========================================
+
+#define BUZZER_ENABLED         1     // 1 = enable passive buzzer, 0 = disable
+#define BUZZER_PIN             15    // GPIO pin connected to buzzer (+)
+#define BUZZER_CHANNEL         0     // LEDC channel for PWM (0-15)
+
+// Tone frequencies (Hz) for game events
+#define BUZZER_FREQ_WALL       800   // Wall bounce - short beep
+#define BUZZER_FREQ_PADDLE     1200  // Paddle hit - higher ping
+#define BUZZER_FREQ_SCORE      1500  // Score gained - victory tone
+#define BUZZER_FREQ_LOST       300   // Score lost - low sad tone
+
+// Tone durations (ms)
+#define BUZZER_DUR_WALL        30    // Short click
+#define BUZZER_DUR_PADDLE      50    // Quick ping
+#define BUZZER_DUR_SCORE       100   // Slightly longer
+#define BUZZER_DUR_LOST        200   // Longer sad sound
+
+// Startup melody selection (0-5):
+//   0 = C Major arpeggio (simple)
+//   1 = "Charge!" fanfare (sports cheer)
+//   2 = "Shave and a Haircut" 
+//   3 = Westminster Chimes (Big Ben)
+//   4 = Retro "Power Up" scale
+//   5 = Classic arcade "Ready!" jingle
+#define STARTUP_MELODY         3     // Try different values 0-5!
 
 #endif

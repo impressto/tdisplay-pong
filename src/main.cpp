@@ -66,6 +66,9 @@ int16_t lastScore2 = -1;
 // AI state
 int16_t aiReactionCounter = 0;
 int16_t aiTargetY = 0;
+// AI state for paddle 1 (demo mode)
+int16_t aiReactionCounter1 = 0;
+int16_t aiTargetY1 = 0;
 
 // Visual effects
 int16_t paddle1FlashFrames = 0;
@@ -249,7 +252,7 @@ void drawMenu() {
   // Title
   tft.setTextColor(COLOR_MENU_TEXT);
   tft.setTextSize(3);
-  tft.setCursor(70, 20);
+  tft.setCursor(70, 5);
   tft.print("PONG");
   
   tft.setTextSize(2);
@@ -259,34 +262,45 @@ void drawMenu() {
     // Quick Play option (uses saved settings)
     if (menuSelection == 0) {
       tft.setTextColor(COLOR_MENU_SELECT);
-      tft.setCursor(40, 50);
+      tft.setCursor(40, 40);
       tft.print("> Quick Play");
     } else {
       tft.setTextColor(0x07FF);  // Cyan
-      tft.setCursor(50, 50);
+      tft.setCursor(50, 40);
       tft.print("Quick Play");
     }
     
     // 1 Player option
     if (menuSelection == 1) {
       tft.setTextColor(COLOR_MENU_SELECT);
-      tft.setCursor(40, 75);
+      tft.setCursor(40, 62);
       tft.print("> 1 Player");
     } else {
       tft.setTextColor(COLOR_MENU_TEXT);
-      tft.setCursor(50, 75);
+      tft.setCursor(50, 62);
       tft.print("1 Player");
     }
     
     // 2 Players option
     if (menuSelection == 2) {
       tft.setTextColor(COLOR_MENU_SELECT);
-      tft.setCursor(40, 100);
+      tft.setCursor(40, 84);
       tft.print("> 2 Players");
     } else {
       tft.setTextColor(COLOR_MENU_TEXT);
-      tft.setCursor(50, 100);
+      tft.setCursor(50, 84);
       tft.print("2 Players");
+    }
+    
+    // Demo option (AI vs AI)
+    if (menuSelection == 3) {
+      tft.setTextColor(COLOR_MENU_SELECT);
+      tft.setCursor(40, 106);
+      tft.print("> Demo");
+    } else {
+      tft.setTextColor(0xF81F);  // Magenta
+      tft.setCursor(50, 106);
+      tft.print("Demo");
     }
   } else if (menuScreen == 1) {
     // Difficulty Selection
@@ -384,7 +398,7 @@ void handleMenu() {
   // Navigate menu
   if (isButtonPressed(P1_UP_BUTTON) || isButtonPressed(EXT_P1_UP)) {
     if (menuScreen == 0) {
-      menuSelection = (menuSelection + 1) % 3;  // 3 options: Quick Play, 1P, 2P
+      menuSelection = (menuSelection + 1) % 4;  // 4 options: Quick Play, 1P, 2P, Demo
     } else {
       menuSelection = (menuSelection + 1) % 3;  // 3 options for difficulty/theme
     }
@@ -400,9 +414,15 @@ void handleMenu() {
         // Quick Play - use saved settings and start immediately
         gameState = STATE_PLAYING;
         startGame();
+      } else if (menuSelection == 3) {
+        // Demo mode - go directly to theme selection (no difficulty matters for AI vs AI)
+        gameMode = GAME_MODE_DEMO;
+        menuScreen = 2;  // Skip difficulty, go to theme
+        menuSelection = theme;  // Use saved theme as default
+        drawMenu();
       } else {
         // Game mode selected (1=1P, 2=2P), go to difficulty screen
-        gameMode = menuSelection - 1;  // Adjust for Quick Play offset
+        gameMode = menuSelection - 1;  // Adjust for Quick Play offset (1->0=1P, 2->1=2P)
         menuScreen = 1;
         menuSelection = difficulty;  // Use saved difficulty as default
         drawMenu();
@@ -492,6 +512,8 @@ void startGame() {
   // Reset AI
   aiReactionCounter = 0;
   aiTargetY = screenH / 2;
+  aiReactionCounter1 = 0;
+  aiTargetY1 = screenH / 2;
   
   // Draw initial state
   drawBackground();
@@ -507,12 +529,33 @@ void startGame() {
 void updatePaddle1() {
   int16_t oldY = paddle1Y;
   
-  // Move paddle based on input
-  if (isButtonPressed(P1_UP_BUTTON) || isButtonPressed(EXT_P1_UP)) {
-    paddle1Y -= PADDLE_SPEED;
-  }
-  if (isButtonPressed(P1_DOWN_BUTTON) || isButtonPressed(EXT_P1_DOWN)) {
-    paddle1Y += PADDLE_SPEED;
+  if (gameMode == GAME_MODE_DEMO) {
+    // AI control for demo mode
+    aiReactionCounter1++;
+    if (aiReactionCounter1 >= AI_REACTION_DELAY) {
+      aiReactionCounter1 = 0;
+      
+      // AI tracks the ball when it's moving toward paddle 1 (left)
+      if (ballDX < 0) {
+        aiTargetY1 = ballY + random(-AI_ERROR_MARGIN, AI_ERROR_MARGIN + 1);
+      }
+    }
+    
+    // Move toward target
+    int16_t paddleCenter = paddle1Y + PADDLE_WIDTH / 2;
+    if (paddleCenter < aiTargetY1 - 2) {
+      paddle1Y += AI_SPEED;
+    } else if (paddleCenter > aiTargetY1 + 2) {
+      paddle1Y -= AI_SPEED;
+    }
+  } else {
+    // Human player - move paddle based on input
+    if (isButtonPressed(P1_UP_BUTTON) || isButtonPressed(EXT_P1_UP)) {
+      paddle1Y -= PADDLE_SPEED;
+    }
+    if (isButtonPressed(P1_DOWN_BUTTON) || isButtonPressed(EXT_P1_DOWN)) {
+      paddle1Y += PADDLE_SPEED;
+    }
   }
   
   // Clamp to screen bounds
