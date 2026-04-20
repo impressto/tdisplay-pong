@@ -1,4 +1,4 @@
-# 🎮 ESP32 Pong Game - Learn Electronics!
+# ESP32 Pong Game - Learn Electronics!
 
 A fun pong game for the TTGO T-Display with sound effects. Choose your sound module:
 - **DFPlayer Mini** — full MP3 playback from SD card, one track per event
