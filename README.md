@@ -21,6 +21,8 @@ A fun pong game for the TTGO T-Display with sound effects. Choose your sound mod
 - Serial communication between devices (DFPlayer)
 - How edge-triggered signals work (ISD1820)
 
+<img src="https://github.com/impressto/tdisplay-pong/blob/master/pong-workshop.jpg" />
+
 ## What You Need
 
 ### Hardware
